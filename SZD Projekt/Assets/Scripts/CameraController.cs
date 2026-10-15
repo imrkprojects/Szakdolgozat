@@ -5,7 +5,7 @@ public class CameraController : MonoBehaviour
     private Vector3 _targetPosition;
     private Vector3 _gridCenter;
 
-    [SerializeField] private float cameraSmoothing = 5f;
+    [SerializeField] private float cameraSmoothing = 3f;
     
     private void Awake()
     {

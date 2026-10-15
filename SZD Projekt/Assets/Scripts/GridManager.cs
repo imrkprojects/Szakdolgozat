@@ -7,15 +7,17 @@ public class GridManager : MonoBehaviour
     public static GridManager Instance { get; private set; }
     
     [Header("Grid Dimensions")]
-    [SerializeField] private int width = 10;
+    [SerializeField] private int width = 20;
     [SerializeField] private int height = 10;
     [SerializeField] private float tileSize = 1.1f; // 1.0 + slight spacing
 
     [Header("Prefabs")]
     [SerializeField] private Tile tilePrefab;
-    [SerializeField] private Unit unitPrefab;
 
     private Dictionary<Vector2Int, Tile> _tiles = new Dictionary<Vector2Int, Tile>();
+    
+    public int Width  => width;
+    public int Height => height;
     
     public static event Action<Vector3> OnGridGenerated;
     
@@ -23,13 +25,21 @@ public class GridManager : MonoBehaviour
     {
         Instance = this;
     }
-
-    private void Start()
+    
+    // Called by MatchManager on init
+    public void BuildGrid()
     {
         GenerateGrid();
-        SpawnInitialUnit();
+        Debug.Log($"Grid generated with dimensions {width} x {height}.");
     }
 
+    // Returns the tile at the given grid coordinate, or null if out of bounds
+    public Tile GetTile(Vector2Int coords)
+    {
+        _tiles.TryGetValue(coords, out Tile tile);
+        return tile;
+    }
+    
     private void GenerateGrid()
     {
         for (int x = 0; x < width; x++)
@@ -75,13 +85,6 @@ public class GridManager : MonoBehaviour
             }
         }
         return adjacent;
-    }
-    
-    private void SpawnInitialUnit()
-    {
-        Tile startTile = _tiles[new Vector2Int(0, 0)];
-        Unit unit = Instantiate(unitPrefab);
-        unit.PlaceOnTile(startTile);
     }
 
     public void OnTileClicked(Tile clickedTile)

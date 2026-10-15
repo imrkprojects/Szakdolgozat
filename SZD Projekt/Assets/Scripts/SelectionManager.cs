@@ -9,25 +9,45 @@ public class SelectionManager : MonoBehaviour
     private List<Tile> _highlightedTiles = new List<Tile>();
     public static event Action<Unit> OnUnitSelected;
     public static event Action OnUnitDeselected;
+    // Fired when the currently selected unit finishes a move
     public static event Action<Unit> OnSelectedUnitMoved;
     
     private void Awake()
     {
         Instance = this;
     }
+
+    private void OnEnable()
+    {
+        TurnManager.OnTurnChanged += HandleTurnChanged;
+    }
+
+    private void OnDisable()
+    {
+        TurnManager.OnTurnChanged -= HandleTurnChanged;
+    }
     
     public void HandleTileClicked(Tile clickedTile)
     {
-        // Clicked a tile with a unit on it → select that unit
+        // Clicked a tile with a unit on it → only the active unit can be selected
         if (clickedTile.OccupyingUnit != null)
         {
-            Select(clickedTile.OccupyingUnit);
+            Unit unit = clickedTile.OccupyingUnit;
+            if (unit != TurnManager.Instance.ActiveUnit)
+            {
+                Debug.Log($"Not your active unit's turn - active unit is {TurnManager.Instance.ActiveUnit?.name} ({TurnManager.Instance.ActivePlayer})");
+                return;
+            }
+            Select(unit);
             return;
         }
-        // A unit is selected and clicked a valid move tile → move
+        // A unit is selected and clicked a valid move tile → move then end the turn
         if (_selectedUnit != null && _selectedUnit.CanMoveTo(clickedTile))
         {
             _selectedUnit.MoveToTile(clickedTile);
+            // HandleUnitMoved fires synchronously above (refreshes highlights, fires OnSelectedUnitMoved)
+            TurnManager.Instance.EndTurn();
+            // HandleTurnChanged fires synchronously above (deselects current, selects new active unit)
             return;
         }
         // Clicked empty non-reachable tile → clear selection
@@ -35,6 +55,13 @@ public class SelectionManager : MonoBehaviour
         {
             Deselect();
         }
+    }
+
+    // Auto-called when TurnManager switches to a new (player, unit) pair
+    private void HandleTurnChanged(PlayerID player, Unit unit)
+    {
+        Deselect();
+        if (unit != null) Select(unit);
     }
     
     private void Select(Unit unit)
@@ -49,7 +76,7 @@ public class SelectionManager : MonoBehaviour
         // Highlights all valid move targets
         HighlightReachableTiles(unit);
         OnUnitSelected?.Invoke(unit);
-        Debug.Log($"Selected unit at {unit.CurrentTile.Coords}");
+        Debug.Log($"Selected {unit.name} at {unit.CurrentTile.Coords}");
     }
     
     private void Deselect()
@@ -62,16 +89,16 @@ public class SelectionManager : MonoBehaviour
         Debug.Log("Deselected");
     }
     
-    // Called when any unit moves but only acts on the currently selected unit
+    // Called when any unit moves but only acts on the currently selected unit (TBC)
     private void HandleUnitMoved(Unit unit)
     {
-        if (unit != _selectedUnit) return;
+        if (unit != _selectedUnit) return; // TBC
         // Refresh highlights to reflect the new position
         ClearHighlights();
         unit.CurrentTile.SetHighlight(TileHighlightState.Selected);
         HighlightReachableTiles(unit);
         OnSelectedUnitMoved?.Invoke(unit);
-        Debug.Log($"Selected unit moved to {unit.CurrentTile.Coords}");
+        Debug.Log($"{unit.name} moved to {unit.CurrentTile.Coords}");
     }
     
     private void HighlightReachableTiles(Unit unit)
