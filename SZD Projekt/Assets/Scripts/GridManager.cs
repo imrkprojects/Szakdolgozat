@@ -43,9 +43,9 @@ public class GridManager : MonoBehaviour
     
     private void GenerateGrid()
     {
-        for (int x = 0; x < width; x++)
+        for (int x = 0; x < Mathf.Max(3, width); x++)
         {
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < Mathf.Max(3, height); y++)
             {
                 Vector3 worldPos = new Vector3(x * tileSize, y * tileSize, 0);
                 Tile spawnedTile = Instantiate(tilePrefab, worldPos, Quaternion.identity, transform);
