@@ -1,20 +1,31 @@
 using UnityEngine;
 using System;
-using System.Collections.Generic;
 
+/// <summary>Tracks the selected unit and routes tile clicks to the active interaction state.</summary>
 public class SelectionManager : MonoBehaviour
-{   
+{
+    /// <summary>The active selection manager instance.</summary>
     public static SelectionManager Instance { get; private set; }
+
     private Unit _selectedUnit;
-    private List<Tile> _highlightedTiles = new List<Tile>();
+    private IInteractionState _currentState;
+
+    // ─── Events ──────────────────────────────────────────────────────────────
+    /// <summary>Raised when a unit becomes selected.</summary>
     public static event Action<Unit> OnUnitSelected;
+    /// <summary>Raised when the current unit is deselected.</summary>
     public static event Action OnUnitDeselected;
-    // Fired when the currently selected unit finishes a move
+    /// <summary>Raised when the selected unit moves.</summary>
     public static event Action<Unit> OnSelectedUnitMoved;
-    
+
+    // ─── Unity lifecycle ─────────────────────────────────────────────────────
     private void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         Instance = this;
     }
 
@@ -27,102 +38,91 @@ public class SelectionManager : MonoBehaviour
     {
         TurnManager.OnTurnChanged -= HandleTurnChanged;
     }
-    
+
+    // ─── Public API ──────────────────────────────────────────────────────────
+
+    /// <summary>The currently selected unit, or null when nothing is selected.</summary>
+    public Unit SelectedUnit => _selectedUnit;
+
+    /// <summary>Processes a tile click using the current selection and interaction state.</summary>
     public void HandleTileClicked(Tile clickedTile)
     {
-        // Clicked a tile with a unit on it → only the active unit can be selected
-        if (clickedTile.OccupyingUnit != null)
+        if (TurnManager.Instance.IsGameOver) return;
+
+        // No unit selected — only allow clicking the active unit to select it
+        if (_selectedUnit == null)
         {
-            Unit unit = clickedTile.OccupyingUnit;
-            if (unit != TurnManager.Instance.ActiveUnit)
+            if (clickedTile.OccupyingUnit != null
+                && clickedTile.OccupyingUnit == TurnManager.Instance.ActiveUnit)
             {
-                Debug.Log($"Not your active unit's turn - active unit is {TurnManager.Instance.ActiveUnit?.name} ({TurnManager.Instance.ActivePlayer})");
-                return;
+                Select(clickedTile.OccupyingUnit);
             }
-            Select(unit);
             return;
         }
-        // A unit is selected and clicked a valid move tile → move then end the turn
-        if (_selectedUnit != null && _selectedUnit.CanMoveTo(clickedTile))
-        {
-            _selectedUnit.MoveToTile(clickedTile);
-            // HandleUnitMoved fires synchronously above (refreshes highlights, fires OnSelectedUnitMoved)
-            TurnManager.Instance.EndTurn();
-            // HandleTurnChanged fires synchronously above (deselects current, selects new active unit)
-            return;
-        }
-        // Clicked empty non-reachable tile → clear selection
-        if (_selectedUnit != null)
-        {
-            Deselect();
-        }
+
+        // A unit is selected — delegate the click to the current interaction state
+        _currentState?.HandleTileClicked(clickedTile);
     }
 
-    // Auto-called when TurnManager switches to a new (player, unit) pair
-    private void HandleTurnChanged(PlayerID player, Unit unit)
-    {
-        Deselect();
-        if (unit != null) Select(unit);
-    }
-    
-    private void Select(Unit unit)
-    {
-        // Clears if another unit is selected
-        if (_selectedUnit != null) Deselect();
-        _selectedUnit = unit;
-        // Listens for movement while this unit is selected
-        Unit.OnUnitMoved += HandleUnitMoved;
-        // Highlights the tile the unit is standing on
-        unit.CurrentTile.SetHighlight(TileHighlightState.Selected);
-        // Highlights all valid move targets
-        HighlightReachableTiles(unit);
-        OnUnitSelected?.Invoke(unit);
-        Debug.Log($"Selected {unit.name} at {unit.CurrentTile.Coords}");
-    }
-    
-    private void Deselect()
+    /// <summary>Switches the selected unit to its default movement mode.</summary>
+    public void EnterMoveMode()
     {
         if (_selectedUnit == null) return;
-        Unit.OnUnitMoved -= HandleUnitMoved;
-        ClearHighlights();
+        SetState(new MoveState(this));
+    }
+
+    /// <summary>
+    /// Switches the selected unit to ability targeting mode.
+    /// </summary>
+    public void EnterAbilityMode(AbilityData ability)
+    {
+        if (_selectedUnit == null || ability == null) return;
+        SetState(new AbilityState(this, ability));
+    }
+
+    /// <summary>Deselects the current unit and exits its interaction state.</summary>
+    public void Deselect()
+    {
+        if (_selectedUnit == null) return;
+        _currentState?.Exit();
+        _currentState = null;
         _selectedUnit = null;
         OnUnitDeselected?.Invoke();
         Debug.Log("Deselected");
     }
-    
-    // Called when any unit moves but only acts on the currently selected unit (TBC)
-    private void HandleUnitMoved(Unit unit)
+
+    /// <summary>
+    /// Fire the OnSelectedUnitMoved event. Called by MoveState after a move.
+    /// </summary>
+    public void NotifySelectedUnitMoved(Unit unit)
     {
-        if (unit != _selectedUnit) return; // TBC
-        // Refresh highlights to reflect the new position
-        ClearHighlights();
-        unit.CurrentTile.SetHighlight(TileHighlightState.Selected);
-        HighlightReachableTiles(unit);
         OnSelectedUnitMoved?.Invoke(unit);
-        Debug.Log($"{unit.name} moved to {unit.CurrentTile.Coords}");
-    }
-    
-    private void HighlightReachableTiles(Unit unit)
-    {
-        List<Tile> adjacent = GridManager.Instance.GetAdjacentTiles(unit.CurrentTile);
-        foreach (Tile tile in adjacent)
-        {
-            if (unit.CanMoveTo(tile))
-            {
-                tile.SetHighlight(TileHighlightState.Reachable);
-                _highlightedTiles.Add(tile);
-            }
-        }
     }
 
-    private void ClearHighlights()
+    // ─── Internal ────────────────────────────────────────────────────────────
+
+    private void Select(Unit unit)
     {
-        // Reset the unit's current tile highlight
-        if (_selectedUnit != null)
-            _selectedUnit.CurrentTile.SetHighlight(TileHighlightState.None);
-        // Reset all reachable tile highlights
-        foreach (Tile tile in _highlightedTiles)
-            tile.SetHighlight(TileHighlightState.None);
-        _highlightedTiles.Clear();
+        if (_selectedUnit != null) Deselect();
+        _selectedUnit = unit;
+        OnUnitSelected?.Invoke(unit);
+        Debug.Log($"Selected {unit.name} at {unit.CurrentTile.Coords}");
+
+        // Default to move mode on selection
+        SetState(new MoveState(this));
+    }
+
+    private void SetState(IInteractionState newState)
+    {
+        _currentState?.Exit();
+        _currentState = newState;
+        _currentState.Enter(_selectedUnit);
+    }
+
+    /// <summary>Selects the next active unit when the turn manager changes turns.</summary>
+    private void HandleTurnChanged(PlayerID player, Unit unit)
+    {
+        Deselect();
+        if (unit != null) Select(unit);
     }
 }

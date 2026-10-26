@@ -2,8 +2,10 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 
+/// <summary>Tracks unit turn order, advances turns, and reports match completion.</summary>
 public class TurnManager : MonoBehaviour
 {
+    /// <summary>The active turn manager instance.</summary>
     public static TurnManager Instance { get; private set; }
 
     // Units stored in registration order. Null slots = dead units (preserves indices)
@@ -14,46 +16,69 @@ public class TurnManager : MonoBehaviour
     private int _p1UnitIndex;
     private int _p2UnitIndex;
 
+    /// <summary>Player whose turn is currently active.</summary>
     public PlayerID ActivePlayer { get; private set; } = PlayerID.Player1;
+
     // The specific unit that must act this turn
+    /// <summary>Unit that must act during the current turn.</summary>
     public Unit ActiveUnit { get; private set; }
 
-    // Fired when control passes to a new (player, unit) pair
+    /// <summary>Raised when control passes to a new player and active unit.</summary>
     public static event Action<PlayerID, Unit> OnTurnChanged;
+
+    /// <summary>Raised once when a player has no units left; carries the winner's ID.</summary>
+    public static event Action<PlayerID> OnGameOver;
+    /// <summary>Whether the match has ended.</summary>
+    public bool IsGameOver { get; private set; }
 
     private void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
     }
 
+    /// <summary>Resets turn order and selects Player 1's first living unit.</summary>
     public void StartGame()
     {
-        ActivePlayer  = PlayerID.Player1;
-        _p1UnitIndex  = 0;
-        _p2UnitIndex  = 0;
-        ActiveUnit    = GetCurrentUnit(PlayerID.Player1);
+        ActivePlayer = PlayerID.Player1;
+        _p1UnitIndex = 0;
+        _p2UnitIndex = 0;
+        ActiveUnit = GetCurrentUnit(PlayerID.Player1);
         OnTurnChanged?.Invoke(ActivePlayer, ActiveUnit);
         Debug.Log($"Game started — {ActivePlayer} acts with {ActiveUnit?.name}");
     }
 
+    /// <summary>Adds a unit to its owner's turn order.</summary>
     public void RegisterUnit(Unit unit)
     {
-        if      (unit.OwnerID == PlayerID.Player1) _player1Units.Add(unit);
+        if (unit.OwnerID == PlayerID.Player1) _player1Units.Add(unit);
         else if (unit.OwnerID == PlayerID.Player2) _player2Units.Add(unit);
     }
 
-    // Called when a unit is removed from the game (death, capture, etc.)
+    /// <summary>Marks a unit's turn-order slot empty without shifting later indices.</summary>
     public void UnregisterUnit(Unit unit)
     {
         // Null the slot so the cycle skips it and list size stays the same (preserves modular indexing)
         int idx = _player1Units.IndexOf(unit);
-        if (idx >= 0) { _player1Units[idx] = null; return; }
+        if (idx >= 0)
+        {
+            _player1Units[idx] = null;
+            return;
+        }
+
         idx = _player2Units.IndexOf(unit);
-        if (idx >= 0)  { _player2Units[idx] = null; }
+        if (idx >= 0)
+        {
+            _player2Units[idx] = null;
+        }
     }
 
-    // Called by SelectionManager after the active unit makes a move
+    /// <summary>Ends the active turn, advances to the next player, and checks for a winner.</summary>
     public void EndTurn()
     {
         // Advance the acting player's index so their next turn uses the next unit (TBC)
@@ -68,7 +93,9 @@ public class TurnManager : MonoBehaviour
         if (ActiveUnit == null)
         {
             Debug.Log($"{ActivePlayer} has no units left!");
-            // TODO: fire a game-over event
+            IsGameOver = true;
+            // The player who just acted wins
+            OnGameOver?.Invoke(ActivePlayer == PlayerID.Player1 ? PlayerID.Player2 : PlayerID.Player1);
             return;
         }
 
@@ -81,7 +108,7 @@ public class TurnManager : MonoBehaviour
     private Unit GetCurrentUnit(PlayerID player)
     {
         List<Unit> units = player == PlayerID.Player1 ? _player1Units : _player2Units;
-        int start        = player == PlayerID.Player1 ? _p1UnitIndex  : _p2UnitIndex;
+        int start = player == PlayerID.Player1 ? _p1UnitIndex : _p2UnitIndex;
 
         for (int i = 0; i < units.Count; i++)
         {
@@ -90,10 +117,11 @@ public class TurnManager : MonoBehaviour
             {
                 // Commit the index so future AdvanceIndex starts from here
                 if (player == PlayerID.Player1) _p1UnitIndex = try_;
-                else                            _p2UnitIndex = try_;
+                else _p2UnitIndex = try_;
                 return units[try_];
             }
         }
+
         return null; // All units dead
     }
 
@@ -104,9 +132,9 @@ public class TurnManager : MonoBehaviour
         if (units.Count == 0) return;
 
         int current = player == PlayerID.Player1 ? _p1UnitIndex : _p2UnitIndex;
-        int next    = (current + 1) % units.Count;
+        int next = (current + 1) % units.Count;
 
         if (player == PlayerID.Player1) _p1UnitIndex = next;
-        else                            _p2UnitIndex = next;
+        else _p2UnitIndex = next;
     }
 }

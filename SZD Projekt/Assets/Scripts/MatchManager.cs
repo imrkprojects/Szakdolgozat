@@ -1,7 +1,9 @@
 using UnityEngine;
 
+/// <summary>Initializes a match by creating players, the grid, and starting units.</summary>
 public class MatchManager : MonoBehaviour
 {
+    /// <summary>The active match manager instance.</summary>
     public static MatchManager Instance { get; private set; }
 
     [SerializeField] private Unit unitPrefab;
@@ -21,13 +23,13 @@ public class MatchManager : MonoBehaviour
         Debug.Log("Match started.");
     }
 
-    // TODO: Move to a separate UnitSpawner class
+    // TODO: Move to a separate UnitSpawner class.
     private void SpawnInitialUnits()
     {
         int w = GridManager.Instance.Width;
         int h = GridManager.Instance.Height;
 
-        // Player 1 — bottom row (x = 0, 1, 2  |  y = 0)
+        // Place Player 1 along the bottom row.
         for (int i = 0; i < 3; i++)
         {
             Unit unit = Instantiate(unitPrefab);
@@ -37,7 +39,7 @@ public class MatchManager : MonoBehaviour
             TurnManager.Instance.RegisterUnit(unit);
         }
 
-        // Player 2 — top row (x = width-1, width-2, width-3  |  y = height-1)
+        // Place Player 2 along the top row, starting at the opposite edge.
         for (int i = 0; i < 3; i++)
         {
             Unit unit = Instantiate(unitPrefab);

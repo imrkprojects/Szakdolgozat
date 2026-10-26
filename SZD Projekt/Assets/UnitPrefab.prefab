@@ -105,3 +105,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5302feef3a394f4389c2d8617131820, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Unit
+  unitID: 0
+  unitColor: {r: 0, g: 0, b: 0, a: 0}
+  maxHp: 30
+  abilities:
+  - {fileID: 11400000, guid: fb85034e8f1484f44943ac32ea41e71b, type: 2}
