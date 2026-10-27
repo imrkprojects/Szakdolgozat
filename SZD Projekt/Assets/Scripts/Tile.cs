@@ -1,32 +1,34 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 /// <summary>Visual state used to choose a tile's highlight color.</summary>
 public enum TileHighlightState
 {
-    None,           // Default grey
-    Reachable,      // Valid move target — green
-    Selected,       // Unit is standing here — yellow
-    AbilityRange,   // Tile is within ability range — orange
-    AbilityTarget   // Tile is the chosen ability target — red/purple
+    None, // Default grey
+    Reachable, // Valid move target — green
+    Selected, // Unit is standing here — yellow
+    AbilityRange, // Tile is within ability range — orange
+    AbilityTarget // Tile is the chosen ability target — red/purple
 }
 
 /// <summary>Stores a grid tile's coordinates, occupant, and pointer/highlight presentation.</summary>
 public class Tile : MonoBehaviour
 {
     [Header("Colors")]
-    [SerializeField] private Color baseColor      = new Color(0.2f, 0.2f, 0.2f);
-    [SerializeField] private Color hoverColor     = new Color(0.35f, 0.35f, 0.35f);
+    [SerializeField] private Color baseColor = new Color(0.2f, 0.2f, 0.2f);
+    [SerializeField] private Color hoverColor = new Color(0.35f, 0.35f, 0.35f);
     [SerializeField] private Color reachableColor = new Color(0.2f, 0.6f, 0.2f);
-    [SerializeField] private Color selectedColor  = new Color(0.8f, 0.75f, 0.1f);
-    [SerializeField] private Color abilityRangeColor  = new Color(0.9f, 0.5f, 0.1f);
+    [SerializeField] private Color selectedColor = new Color(0.8f, 0.75f, 0.1f);
+    [SerializeField] private Color abilityRangeColor = new Color(0.9f, 0.5f, 0.1f);
     [SerializeField] private Color abilityTargetColor = new Color(0.8f, 0.1f, 0.1f);
 
     private SpriteRenderer _spriteRenderer;
     private TileHighlightState _currentHighlight = TileHighlightState.None;
     private bool _isHovered;
-    
+
     /// <summary>Grid coordinates assigned when the tile is initialized.</summary>
     public Vector2Int Coords { get; private set; }
+
     /// <summary>The unit on this tile, or null when the tile is empty.</summary>
     public Unit OccupyingUnit { get; set; }
 
@@ -43,13 +45,17 @@ public class Tile : MonoBehaviour
         _isHovered = true;
         ApplyColor();
     }
+
     private void OnMouseExit()
     {
         _isHovered = false;
         ApplyColor();
     }
+
     private void OnMouseDown()
     {
+        // OnMouseDown ignores UI, so a click on a button over the grid would also hit this tile
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
         GridManager.Instance.OnTileClicked(this);
     }
 
@@ -59,7 +65,7 @@ public class Tile : MonoBehaviour
         _currentHighlight = state;
         ApplyColor();
     }
-    
+
     private void ApplyColor()
     {
         switch (_currentHighlight)

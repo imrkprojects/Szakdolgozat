@@ -2,8 +2,8 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// Deals a fixed amount of damage to every unit on the target tiles
-/// (except the caster, so self-damage is never accidental).
+/// Deals a fixed amount of damage to every enemy unit on the target tiles
+/// (the caster and its allies are never hit).
 /// Create via: right-click → Create → Game → Ability Effects → Damage
 /// </summary>
 [CreateAssetMenu(fileName = "DamageEffect", menuName = "Game/Ability Effects/Damage")]
@@ -16,7 +16,7 @@ public class DamageEffect : AbilityEffect
         foreach (Tile tile in targetTiles)
         {
             Unit target = tile.OccupyingUnit;
-            if (target != null && target != caster)
+            if (target != null && target.OwnerID != caster.OwnerID)
             {
                 target.TakeDamage(damage);
             }

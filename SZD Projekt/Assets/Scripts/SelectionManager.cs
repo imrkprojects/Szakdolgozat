@@ -13,8 +13,10 @@ public class SelectionManager : MonoBehaviour
     // ─── Events ──────────────────────────────────────────────────────────────
     /// <summary>Raised when a unit becomes selected.</summary>
     public static event Action<Unit> OnUnitSelected;
+
     /// <summary>Raised when the current unit is deselected.</summary>
     public static event Action OnUnitDeselected;
+
     /// <summary>Raised when the selected unit moves.</summary>
     public static event Action<Unit> OnSelectedUnitMoved;
 
@@ -26,6 +28,7 @@ public class SelectionManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
         Instance = this;
     }
 
@@ -57,6 +60,7 @@ public class SelectionManager : MonoBehaviour
             {
                 Select(clickedTile.OccupyingUnit);
             }
+
             return;
         }
 
@@ -67,7 +71,8 @@ public class SelectionManager : MonoBehaviour
     /// <summary>Switches the selected unit to its default movement mode.</summary>
     public void EnterMoveMode()
     {
-        if (_selectedUnit == null) return;
+        // Blocked mid-action: switching modes while a move or ability plays would show stale highlights
+        if (_selectedUnit == null || _selectedUnit.IsActing) return;
         SetState(new MoveState(this));
     }
 
@@ -76,7 +81,8 @@ public class SelectionManager : MonoBehaviour
     /// </summary>
     public void EnterAbilityMode(AbilityData ability)
     {
-        if (_selectedUnit == null || ability == null) return;
+        // Blocked mid-action: the running action already ends the turn, so casting now would act twice
+        if (_selectedUnit == null || ability == null || _selectedUnit.IsActing) return;
         SetState(new AbilityState(this, ability));
     }
 
@@ -122,7 +128,7 @@ public class SelectionManager : MonoBehaviour
     /// <summary>Selects the next active unit when the turn manager changes turns.</summary>
     private void HandleTurnChanged(PlayerID player, Unit unit)
     {
-        Deselect();
+        Deselect(); // Safety net
         if (unit != null) Select(unit);
     }
 }

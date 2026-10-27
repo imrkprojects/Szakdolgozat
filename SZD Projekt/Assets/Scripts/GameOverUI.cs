@@ -6,8 +6,8 @@ using UnityEngine.SceneManagement;
 /// <remarks>Attach this to an always-active object so it can subscribe before the overlay is shown.</remarks>
 public class GameOverUI : MonoBehaviour
 {
-    [SerializeField] private GameObject overlay;      // GameOverOverlay
-    [SerializeField] private TMP_Text resultText;     // ResultText
+    [SerializeField] private GameObject overlay; // GameOverOverlay
+    [SerializeField] private TMP_Text resultText; // ResultText
     [SerializeField] private string gameSceneName = "GameScene";
     [SerializeField] private string mainMenuSceneName = "MainMenu";
 
@@ -29,6 +29,8 @@ public class GameOverUI : MonoBehaviour
     /// <summary>Shows the winner when the turn manager reports the end of the match.</summary>
     private void HandleGameOver(PlayerID winner)
     {
+        // EndTurn skips OnTurnChanged on game over, so clear the selection and highlights here
+        SelectionManager.Instance.Deselect();
         resultText.text = $"{PlayerManager.Instance.GetPlayer(winner).Name} wins!";
         // TODO: Show scores once the score system exists
         overlay.SetActive(true);

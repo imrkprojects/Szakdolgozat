@@ -35,9 +35,14 @@ public class Unit : MonoBehaviour
     /// <summary>Read-only view of the unit's ability list.</summary>
     public IReadOnlyList<AbilityData> Abilities => abilities;
 
+    /// <summary>True from ability start until its effects (and later its animation) finish.</summary>
+    public bool IsUsingAbility { get; private set; }
+
+    /// <summary>True while the unit is moving or using an ability; no new action may start.</summary>
+    public bool IsActing => IsMoving || IsUsingAbility;
+
     // ─── Events ──────────────────────────────────────────────────────────────
     public static event Action<Unit> OnUnitPlaced;
-    public static event Action<Unit> OnUnitMoved;
     public static event Action<Unit> OnUnitDied;
 
     // ─── Unity lifecycle ─────────────────────────────────────────────────────
@@ -83,13 +88,12 @@ public class Unit : MonoBehaviour
 
     // ─── Movement (Gameplay) ─────────────────────────────────────────────────
     /// <summary>
-    /// Player-initiated move. Logical position changes immediately (OnUnitMoved fires),
+    /// Player-initiated move. Logical position changes immediately,
     /// the transform animates, then after a short pause <paramref name="onComplete"/> is invoked.
     /// </summary>
     public void MoveToTile(Tile targetTile, Action onComplete = null)
     {
         PlaceOnTile(targetTile, snap: false);
-        OnUnitMoved?.Invoke(this);
         StartCoroutine(AnimateMove(targetTile.transform.position, onComplete));
     }
 
@@ -115,6 +119,19 @@ public class Unit : MonoBehaviour
         int deltaX = Mathf.Abs(CurrentTile.Coords.x - targetTile.Coords.x);
         int deltaY = Mathf.Abs(CurrentTile.Coords.y - targetTile.Coords.y);
         return (deltaX + deltaY) == 1;
+    }
+
+    // ─── Abilities (Gameplay) ────────────────────────────────────────────────
+    /// <summary>
+    /// Player-initiated ability use. Applies the effects, then invokes <paramref name="onComplete"/>.
+    /// </summary>
+    public void UseAbility(AbilityData ability, List<Tile> targetTiles, Action onComplete = null)
+    {
+        // shortcut: no ability animation yet, so this finishes in the same frame; turn it into a coroutine like AnimateMove when animations exist
+        IsUsingAbility = true;
+        ability.Execute(this, targetTiles);
+        IsUsingAbility = false;
+        onComplete?.Invoke();
     }
 
     // ─── Health Modification ──────────────────────────────────────────────────────────────

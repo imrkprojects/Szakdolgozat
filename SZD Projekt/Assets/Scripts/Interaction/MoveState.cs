@@ -33,14 +33,10 @@ public class MoveState : IInteractionState
                 _highlightedTiles.Add(tile);
             }
         }
-
-        // Listen for movement so we can refresh highlights after a move
-        Unit.OnUnitMoved += HandleUnitMoved;
     }
 
     public void Exit()
     {
-        Unit.OnUnitMoved -= HandleUnitMoved;
         ClearHighlights();
         _unit = null;
     }
@@ -63,9 +59,12 @@ public class MoveState : IInteractionState
         // Clicked a valid move tile → move then end the turn
         if (_unit.CanMoveTo(clickedTile))
         {
-            // HandleUnitMoved fires synchronously (refreshes highlights, fires OnSelectedUnitMoved);
-            // the turn ends only once the animation (and pause) completes.
+            // The turn ends only once the animation (and pause) completes.
+            ClearHighlights();
             _unit.MoveToTile(clickedTile, () => TurnManager.Instance.EndTurn());
+            _unit.CurrentTile.SetHighlight(TileHighlightState.Selected);
+            _selectionManager.NotifySelectedUnitMoved(_unit);
+            Debug.Log($"{_unit.name} moved to {_unit.CurrentTile.Coords}");
             return;
         }
 
@@ -74,28 +73,6 @@ public class MoveState : IInteractionState
     }
 
     // ─── Internal ────────────────────────────────────────────────────────────
-    private void HandleUnitMoved(Unit unit)
-    {
-        if (unit != _unit) return;
-
-        // Refresh highlights to reflect the new position
-        ClearHighlights();
-        _unit.CurrentTile.SetHighlight(TileHighlightState.Selected);
-
-        List<Tile> adjacent = GridManager.Instance.GetAdjacentTiles(_unit.CurrentTile);
-        foreach (Tile tile in adjacent)
-        {
-            if (_unit.CanMoveTo(tile))
-            {
-                tile.SetHighlight(TileHighlightState.Reachable);
-                _highlightedTiles.Add(tile);
-            }
-        }
-
-        _selectionManager.NotifySelectedUnitMoved(unit);
-        Debug.Log($"{unit.name} moved to {unit.CurrentTile.Coords}");
-    }
-
     private void ClearHighlights()
     {
         if (_unit != null)

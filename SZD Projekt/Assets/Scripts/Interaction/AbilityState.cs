@@ -48,6 +48,9 @@ public class AbilityState : IInteractionState
 
     public void HandleTileClicked(Tile clickedTile)
     {
+        // Ignore input while the ability (or a move) plays
+        if (_unit.IsActing) return;
+
         // Clicked the unit's own tile → cancel back to move mode
         if (clickedTile == _unit.CurrentTile)
         {
@@ -58,16 +61,19 @@ public class AbilityState : IInteractionState
         // Clicked a tile within ability range → execute the ability
         if (_targetableTiles != null && _targetableTiles.Contains(clickedTile))
         {
+            // Empty or friendly tile in range — ignore so a misclick doesn't waste the turn
+            Unit target = clickedTile.OccupyingUnit;
+            if (target == null || target.OwnerID == _unit.OwnerID) return;
+
             // Brief visual feedback — mark the target tile
             clickedTile.SetHighlight(TileHighlightState.AbilityTarget);
 
-            // Execute all effects on the clicked tile
-            _ability.Execute(_unit, new List<Tile> { clickedTile });
+            // Logged first: ending the turn deselects, which clears _unit
             Debug.Log($"{_unit.name} used {_ability.abilityName} on tile {clickedTile.Coords}");
 
-            // End the turn — TurnManager.OnTurnChanged will fire and SelectionManager
-            // will deselect + select the next active unit automatically
-            TurnManager.Instance.EndTurn();
+            // Execute all effects on the clicked tile, then end the turn — TurnManager.OnTurnChanged
+            // will fire and SelectionManager will deselect + select the next active unit automatically
+            _unit.UseAbility(_ability, new List<Tile> { clickedTile }, () => TurnManager.Instance.EndTurn());
             return;
         }
 

@@ -9,7 +9,7 @@ public abstract class TargetingRule : ScriptableObject
 {
     /// <summary>
     /// Returns all tiles the caster can point an ability at.
-    /// Filtering (enemy-only, occupied-only, etc.) is handled separately in AbilityData.
+    /// AbilityState only accepts clicks on tiles holding an enemy unit.
     /// </summary>
     public abstract List<Tile> GetTargetableTiles(Unit caster);
 }
