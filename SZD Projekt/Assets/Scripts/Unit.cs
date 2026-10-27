@@ -1,4 +1,5 @@
 using UnityEngine;
+using TMPro;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -44,6 +45,7 @@ public class Unit : MonoBehaviour
     // ─── Events ──────────────────────────────────────────────────────────────
     public static event Action<Unit> OnUnitPlaced;
     public static event Action<Unit> OnUnitDied;
+    public static event Action<Unit> OnHealthChanged;
 
     // ─── Unity lifecycle ─────────────────────────────────────────────────────
     private void Awake()
@@ -72,6 +74,24 @@ public class Unit : MonoBehaviour
                 _spriteRenderer.color = owner.Color;
                 unitColor = owner.Color;
             }
+        }
+    }
+
+    /// <summary>Sets the unit's number and shows it as a label on top of the sprite.</summary>
+    public void SetNumber(int number)
+    {
+        unitID = number;
+        var label = new GameObject("NumberLabel").AddComponent<TextMeshPro>();
+        label.transform.SetParent(transform, false);
+        label.rectTransform.sizeDelta = Vector2.one;
+        label.text = number.ToString();
+        label.fontSize = 6;
+        label.alignment = TextAlignmentOptions.Center;
+        label.color = Color.white;
+        if (_spriteRenderer != null)
+        {
+            label.sortingLayerID = _spriteRenderer.sortingLayerID;
+            label.sortingOrder = _spriteRenderer.sortingOrder + 1;
         }
     }
 
@@ -140,6 +160,7 @@ public class Unit : MonoBehaviour
         if (amount <= 0) return;
         CurrentHp = Mathf.Max(0, CurrentHp - amount);
         Debug.Log($"{name} took {amount} damage — HP: {CurrentHp}/{MaxHp}");
+        OnHealthChanged?.Invoke(this);
         if (CurrentHp <= 0) Die();
     }
 
@@ -148,6 +169,7 @@ public class Unit : MonoBehaviour
         if (amount <= 0) return;
         CurrentHp = Mathf.Min(MaxHp, CurrentHp + amount);
         Debug.Log($"{name} healed {amount} — HP: {CurrentHp}/{MaxHp}");
+        OnHealthChanged?.Invoke(this);
     }
 
     private void Die()

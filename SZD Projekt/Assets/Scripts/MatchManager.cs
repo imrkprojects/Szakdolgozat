@@ -10,7 +10,12 @@ public class MatchManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
     }
 
@@ -35,6 +40,7 @@ public class MatchManager : MonoBehaviour
             Unit unit = Instantiate(unitPrefab);
             unit.name = $"P1_Unit{i + 1}";
             unit.SetOwner(PlayerID.Player1);
+            unit.SetNumber(i + 1);
             unit.PlaceOnTile(GridManager.Instance.GetTile(new Vector2Int(i, 0)));
             TurnManager.Instance.RegisterUnit(unit);
         }
@@ -45,6 +51,7 @@ public class MatchManager : MonoBehaviour
             Unit unit = Instantiate(unitPrefab);
             unit.name = $"P2_Unit{i + 1}";
             unit.SetOwner(PlayerID.Player2);
+            unit.SetNumber(i + 1);
             unit.PlaceOnTile(GridManager.Instance.GetTile(new Vector2Int(w - 1 - i, h - 1)));
             TurnManager.Instance.RegisterUnit(unit);
         }
