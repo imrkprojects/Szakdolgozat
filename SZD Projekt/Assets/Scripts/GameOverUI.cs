@@ -3,9 +3,11 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>Displays the game result and handles the game-over menu buttons.</summary>
-/// <remarks>Attach this to an always-active object so it can subscribe before the overlay is shown.</remarks>
 public class GameOverUI : MonoBehaviour
 {
+    private Match _match;
+    private SelectionManager _selection;
+
     [SerializeField] private GameObject overlay; // GameOverOverlay
     [SerializeField] private TMP_Text resultText; // ResultText
     [SerializeField] private string gameSceneName = "GameScene";
@@ -16,22 +18,25 @@ public class GameOverUI : MonoBehaviour
         overlay.SetActive(false);
     }
 
-    private void OnEnable()
+    /// <summary>Links the overlay to the match so it shows when the match ends.</summary>
+    public void Init(Match match, SelectionManager selection)
     {
-        TurnManager.OnGameOver += HandleGameOver;
+        _match = match;
+        _selection = selection;
+        _match.Turns.GameOver += HandleGameOver;
     }
 
-    private void OnDisable()
+    private void OnDestroy()
     {
-        TurnManager.OnGameOver -= HandleGameOver;
+        if (_match != null) _match.Turns.GameOver -= HandleGameOver;
     }
 
-    /// <summary>Shows the winner when the turn manager reports the end of the match.</summary>
+    /// <summary>Shows the winner when the turn order reports the end of the match.</summary>
     private void HandleGameOver(PlayerID winner)
     {
         // EndTurn skips OnTurnChanged on game over, so clear the selection and highlights here
-        SelectionManager.Instance.Deselect();
-        resultText.text = $"{PlayerManager.Instance.GetPlayer(winner).Name} wins!";
+        _selection.Deselect();
+        resultText.text = $"{_match.GetPlayer(winner).Name} wins!";
         // TODO: Show scores once the score system exists
         overlay.SetActive(true);
     }

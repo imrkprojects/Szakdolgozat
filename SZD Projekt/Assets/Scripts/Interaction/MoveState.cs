@@ -8,12 +8,16 @@ using System.Collections.Generic;
 public class MoveState : IInteractionState
 {
     private readonly SelectionManager _selectionManager;
+    private readonly Match _match;
+    private readonly GridManager _grid;
     private readonly List<Tile> _highlightedTiles = new List<Tile>();
     private Unit _unit;
 
-    public MoveState(SelectionManager selectionManager)
+    public MoveState(SelectionManager selectionManager, Match match, GridManager grid)
     {
         _selectionManager = selectionManager;
+        _match = match;
+        _grid = grid;
     }
 
     public void Enter(Unit selectedUnit)
@@ -24,14 +28,11 @@ public class MoveState : IInteractionState
         _unit.CurrentTile.SetHighlight(TileHighlightState.Selected);
 
         // Highlight all valid move targets
-        List<Tile> adjacent = GridManager.Instance.GetAdjacentTiles(_unit.CurrentTile);
-        foreach (Tile tile in adjacent)
+        foreach (Vector2Int pos in _match.GetMoveTargets(_unit.State))
         {
-            if (_unit.CanMoveTo(tile))
-            {
-                tile.SetHighlight(TileHighlightState.Reachable);
-                _highlightedTiles.Add(tile);
-            }
+            Tile tile = _grid.GetTile(pos);
+            tile.SetHighlight(TileHighlightState.Reachable);
+            _highlightedTiles.Add(tile);
         }
     }
 
@@ -57,11 +58,14 @@ public class MoveState : IInteractionState
         }
 
         // Clicked a valid move tile → move then end the turn
-        if (_unit.CanMoveTo(clickedTile))
+        Tile from = _unit.CurrentTile;
+        if (_match.TryMove(_unit.State, clickedTile.Coords))
         {
-            // The turn ends only once the animation (and pause) completes.
+            // The state has already moved, so CurrentTile is the new tile; clear the old one by hand
+            from.SetHighlight(TileHighlightState.None);
             ClearHighlights();
-            _unit.MoveToTile(clickedTile, () => TurnManager.Instance.EndTurn());
+            // The turn ends only once the animation (and pause) completes.
+            _unit.MoveToTile(clickedTile, _match.EndTurn);
             _unit.CurrentTile.SetHighlight(TileHighlightState.Selected);
             _selectionManager.NotifySelectedUnitMoved(_unit);
             Debug.Log($"{_unit.name} moved to {_unit.CurrentTile.Coords}");

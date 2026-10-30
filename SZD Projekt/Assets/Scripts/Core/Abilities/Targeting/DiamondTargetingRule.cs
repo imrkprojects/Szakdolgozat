@@ -9,14 +9,14 @@ using System.Collections.Generic;
 [CreateAssetMenu(fileName = "DiamondTargeting", menuName = "Game/Ability Targeting/Diamond")]
 public class DiamondTargetingRule : TargetingRule
 {
-    [Tooltip("Maximum Manhattan distance from the caster tile.")]
-    [SerializeField] private int range = 2;
+    [Tooltip("Maximum Manhattan distance from the caster tile.")] [SerializeField]
+    private int range = 2;
 
-    [Tooltip("If true the caster's own tile is excluded from the targetable set.")]
-    [SerializeField] private bool excludeSelf = true;
+    [Tooltip("If true the caster's own tile is excluded from the targetable set.")] [SerializeField]
+    private bool excludeSelf = true;
 
-    public override List<Tile> GetTargetableTiles(Unit caster)
+    public override List<Vector2Int> GetTargetablePositions(Board board, UnitState caster)
     {
-        return GridManager.Instance.GetTilesInRange(caster.CurrentTile, range, excludeSelf);
+        return board.GetInRange(caster.Position, range, excludeSelf);
     }
 }

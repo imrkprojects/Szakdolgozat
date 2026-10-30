@@ -1,6 +1,6 @@
 using UnityEngine;
 
-/// <summary>Moves and zooms the camera in response to grid and unit selection events.</summary>
+/// <summary>Moves and zooms the camera to frame the grid and follow the selected unit.</summary>
 public class CameraController : MonoBehaviour
 {
     private Vector3 _targetPosition;
@@ -13,6 +13,7 @@ public class CameraController : MonoBehaviour
 
     private float _targetSize;
     private Unit _followUnit;
+    private SelectionManager _selection;
 
     private void Awake()
     {
@@ -21,24 +22,26 @@ public class CameraController : MonoBehaviour
         _targetSize = _camera.orthographicSize;
     }
 
-    private void OnEnable()
+    /// <summary>Snaps to the built grid and starts following the selection. Call after the grid is built.</summary>
+    public void Init(GridManager grid, SelectionManager selection)
     {
-        GridManager.OnGridGenerated += HandleGridGenerated;
-        SelectionManager.OnUnitSelected += HandleUnitSelected;
-        SelectionManager.OnUnitDeselected += HandleUnitDeselected;
-        SelectionManager.OnSelectedUnitMoved += HandleSelectedUnitMoved;
+        _selection = selection;
+        _selection.OnUnitSelected += HandleUnitSelected;
+        _selection.OnUnitDeselected += HandleUnitDeselected;
+        _selection.OnSelectedUnitMoved += HandleSelectedUnitMoved;
+        SnapToGrid(grid.GetGridCenter());
     }
 
-    private void OnDisable()
+    private void OnDestroy()
     {
-        GridManager.OnGridGenerated -= HandleGridGenerated;
-        SelectionManager.OnUnitSelected -= HandleUnitSelected;
-        SelectionManager.OnUnitDeselected -= HandleUnitDeselected;
-        SelectionManager.OnSelectedUnitMoved -= HandleSelectedUnitMoved;
+        if (_selection == null) return;
+        _selection.OnUnitSelected -= HandleUnitSelected;
+        _selection.OnUnitDeselected -= HandleUnitDeselected;
+        _selection.OnSelectedUnitMoved -= HandleSelectedUnitMoved;
     }
 
     /// <summary>Initial camera position — snaps instantly to grid center, zoomed out.</summary>
-    private void HandleGridGenerated(Vector3 gridCenter)
+    private void SnapToGrid(Vector3 gridCenter)
     {
         _gridCenter = gridCenter;
         _targetPosition = new Vector3(gridCenter.x, gridCenter.y, -10f);
@@ -67,7 +70,7 @@ public class CameraController : MonoBehaviour
         _targetPosition = new Vector3(_gridCenter.x, _gridCenter.y, -10f);
         _targetSize = overviewSize;
     }
-    
+
     /// <summary>Updates camera for following animated unit.</summary>
     private void Update()
     {

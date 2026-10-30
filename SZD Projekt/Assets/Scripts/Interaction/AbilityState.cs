@@ -8,14 +8,18 @@ using System.Collections.Generic;
 public class AbilityState : IInteractionState
 {
     private readonly SelectionManager _selectionManager;
+    private readonly Match _match;
+    private readonly GridManager _grid;
     private readonly AbilityData _ability;
     private readonly List<Tile> _highlightedTiles = new List<Tile>();
     private List<Tile> _targetableTiles;
     private Unit _unit;
 
-    public AbilityState(SelectionManager selectionManager, AbilityData ability)
+    public AbilityState(SelectionManager selectionManager, Match match, GridManager grid, AbilityData ability)
     {
         _selectionManager = selectionManager;
+        _match = match;
+        _grid = grid;
         _ability = ability;
     }
 
@@ -27,7 +31,7 @@ public class AbilityState : IInteractionState
         _unit.CurrentTile.SetHighlight(TileHighlightState.Selected);
 
         // Get targetable tiles from the ability's targeting rule
-        _targetableTiles = _ability.GetTargetableTiles(_unit);
+        _targetableTiles = _match.GetAbilityTargets(_unit.State, _ability).ConvertAll(_grid.GetTile);
 
         // Highlight all tiles in range
         foreach (Tile tile in _targetableTiles)
@@ -61,19 +65,18 @@ public class AbilityState : IInteractionState
         // Clicked a tile within ability range → execute the ability
         if (_targetableTiles != null && _targetableTiles.Contains(clickedTile))
         {
-            // Empty or friendly tile in range — ignore so a misclick doesn't waste the turn
-            Unit target = clickedTile.OccupyingUnit;
-            if (target == null || target.OwnerID == _unit.OwnerID) return;
+            // Match rejects empty or friendly tiles — ignore the click so a misclick doesn't waste the turn
+            if (!_match.TryUseAbility(_unit.State, _ability, clickedTile.Coords)) return;
 
             // Brief visual feedback — mark the target tile
             clickedTile.SetHighlight(TileHighlightState.AbilityTarget);
 
-            // Logged first: ending the turn deselects, which clears _unit
+            // Logged before ending the turn: that deselects, which clears _unit
             Debug.Log($"{_unit.name} used {_ability.abilityName} on tile {clickedTile.Coords}");
 
-            // Execute all effects on the clicked tile, then end the turn — TurnManager.OnTurnChanged
+            // Effects are already applied; end the turn once the ability has played — TurnCycle.TurnChanged
             // will fire and SelectionManager will deselect + select the next active unit automatically
-            _unit.UseAbility(_ability, new List<Tile> { clickedTile }, () => TurnManager.Instance.EndTurn());
+            _unit.PlayAbility(_match.EndTurn);
             return;
         }
 

@@ -8,8 +8,8 @@ using System.Collections.Generic;
 public abstract class TargetingRule : ScriptableObject
 {
     /// <summary>
-    /// Returns all tiles the caster can point an ability at.
+    /// Returns all cells the caster can point an ability at.
     /// AbilityState only accepts clicks on tiles holding an enemy unit.
     /// </summary>
-    public abstract List<Tile> GetTargetableTiles(Unit caster);
+    public abstract List<Vector2Int> GetTargetablePositions(Board board, UnitState caster);
 }

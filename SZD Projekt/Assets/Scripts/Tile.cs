@@ -14,8 +14,7 @@ public enum TileHighlightState
 /// <summary>Stores a grid tile's coordinates, occupant, and pointer/highlight presentation.</summary>
 public class Tile : MonoBehaviour
 {
-    [Header("Colors")]
-    [SerializeField] private Color baseColor = new Color(0.2f, 0.2f, 0.2f);
+    [Header("Colors")] [SerializeField] private Color baseColor = new Color(0.2f, 0.2f, 0.2f);
     [SerializeField] private Color hoverColor = new Color(0.35f, 0.35f, 0.35f);
     [SerializeField] private Color reachableColor = new Color(0.2f, 0.6f, 0.2f);
     [SerializeField] private Color selectedColor = new Color(0.8f, 0.75f, 0.1f);
@@ -25,17 +24,19 @@ public class Tile : MonoBehaviour
     private SpriteRenderer _spriteRenderer;
     private TileHighlightState _currentHighlight = TileHighlightState.None;
     private bool _isHovered;
+    private GridManager _grid;
 
     /// <summary>Grid coordinates assigned when the tile is initialized.</summary>
     public Vector2Int Coords { get; private set; }
 
     /// <summary>The unit on this tile, or null when the tile is empty.</summary>
-    public Unit OccupyingUnit { get; set; }
+    public Unit OccupyingUnit => _grid.GetUnitView(Coords);
 
-    /// <summary>Sets the tile's grid coordinates and initializes its renderer.</summary>
-    public void Init(int x, int y)
+    /// <summary>Sets the tile's grid coordinates and owning grid, and initializes its renderer.</summary>
+    public void Init(int x, int y, GridManager grid)
     {
         Coords = new Vector2Int(x, y);
+        _grid = grid;
         _spriteRenderer = GetComponent<SpriteRenderer>();
         ApplyColor();
     }
@@ -56,7 +57,7 @@ public class Tile : MonoBehaviour
     {
         // OnMouseDown ignores UI, so a click on a button over the grid would also hit this tile
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
-        GridManager.Instance.OnTileClicked(this);
+        _grid.OnTileClicked(this);
     }
 
     /// <summary>Changes the tile highlight and immediately refreshes its color.</summary>

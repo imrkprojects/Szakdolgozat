@@ -11,13 +11,14 @@ public class DamageEffect : AbilityEffect
 {
     [SerializeField] private int damage = 10;
 
-    public override void Apply(Unit caster, List<Tile> targetTiles)
+    public override void Apply(Match match, UnitState caster, IReadOnlyList<Vector2Int> targets)
     {
-        foreach (Tile tile in targetTiles)
+        foreach (Vector2Int pos in targets)
         {
-            Unit target = tile.OccupyingUnit;
-            if (target != null && target.OwnerID != caster.OwnerID)
+            UnitState target = match.Board.GetUnitAt(pos);
+            if (target != null && target.Owner != caster.Owner)
             {
+                Debug.Log($"Unit at {pos} takes {damage} damage");
                 target.TakeDamage(damage);
             }
         }

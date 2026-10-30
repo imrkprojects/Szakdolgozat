@@ -1,0 +1,6 @@
+# Track only the Unity project sources; everything else is local
+/*
+!/.gitignore
+!/Assets/
+!/Packages/
+!/ProjectSettings/

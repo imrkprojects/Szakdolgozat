@@ -2,12 +2,12 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>Move/ability buttons for the selected unit; shown only while a unit is selected.</summary>
-/// <remarks>Attach this to an always-active object so it can subscribe before the panel is shown.</remarks>
 public class ActionBarUI : MonoBehaviour
 {
-    [SerializeField] private GameObject panel;        // ActionBarPanel
-    [SerializeField] private Button abilityButton;    // AbilityButton
+    [SerializeField] private GameObject panel; // ActionBarPanel
+    [SerializeField] private Button abilityButton; // AbilityButton
 
+    private SelectionManager _selection;
     private Unit _unit;
 
     private void Awake()
@@ -15,16 +15,19 @@ public class ActionBarUI : MonoBehaviour
         panel.SetActive(false);
     }
 
-    private void OnEnable()
+    /// <summary>Links the bar to the selection it shows and controls.</summary>
+    public void Init(SelectionManager selection)
     {
-        SelectionManager.OnUnitSelected += HandleUnitSelected;
-        SelectionManager.OnUnitDeselected += HandleUnitDeselected;
+        _selection = selection;
+        _selection.OnUnitSelected += HandleUnitSelected;
+        _selection.OnUnitDeselected += HandleUnitDeselected;
     }
 
-    private void OnDisable()
+    private void OnDestroy()
     {
-        SelectionManager.OnUnitSelected -= HandleUnitSelected;
-        SelectionManager.OnUnitDeselected -= HandleUnitDeselected;
+        if (_selection == null) return;
+        _selection.OnUnitSelected -= HandleUnitSelected;
+        _selection.OnUnitDeselected -= HandleUnitDeselected;
     }
 
     private void HandleUnitSelected(Unit unit)
@@ -41,12 +44,12 @@ public class ActionBarUI : MonoBehaviour
     }
 
     /// <summary>Switches the selected unit to movement mode. Wire this to the Move button.</summary>
-    public void OnMoveClicked() => SelectionManager.Instance.EnterMoveMode();
+    public void OnMoveClicked() => _selection.EnterMoveMode();
 
     /// <summary>Switches the selected unit to targeting with its first ability. Wire this to the Ability button.</summary>
     public void OnAbilityClicked()
     {
         if (_unit != null && _unit.Abilities.Count > 0)
-            SelectionManager.Instance.EnterAbilityMode(_unit.Abilities[0]);
+            _selection.EnterAbilityMode(_unit.Abilities[0]);
     }
 }

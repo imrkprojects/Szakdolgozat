@@ -4,6 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
+/// <summary>Scene view of a unit: sprite, label and move animation. Game state lives in <see cref="State"/>.</summary>
 public class Unit : MonoBehaviour
 {
     public int unitID;
@@ -12,16 +13,21 @@ public class Unit : MonoBehaviour
     [SerializeField] private Color unitColor;
     private SpriteRenderer _spriteRenderer;
 
-    // ─── Ownership ───────────────────────────────────────────────────────────
-    public PlayerID OwnerID { get; private set; } = PlayerID.None;
+    // ─── State ───────────────────────────────────────────────────────────────
+    private GridManager _grid;
+
+    /// <summary>Game state of this unit; created by <see cref="Init"/>.</summary>
+    public UnitState State { get; private set; }
+
+    public PlayerID OwnerID => State.Owner;
 
     // ─── Position ────────────────────────────────────────────────────────────
-    public Tile CurrentTile { get; private set; }
+    public Tile CurrentTile => _grid.GetTile(State.Position);
 
     // ─── Health ──────────────────────────────────────────────────────────────
     [Header("Stats")] [SerializeField] private int maxHp = 30;
-    public int MaxHp => maxHp;
-    public int CurrentHp { get; private set; }
+    public int MaxHp => State.MaxHp;
+    public int CurrentHp => State.Hp;
 
     // ─── Movement animation ──────────────────────────────────────────────────
     [Header("Movement")] [SerializeField] private float moveDuration = 0.3f;
@@ -34,7 +40,7 @@ public class Unit : MonoBehaviour
     [Header("Abilities")] [SerializeField] private List<AbilityData> abilities = new List<AbilityData>();
 
     /// <summary>Read-only view of the unit's ability list.</summary>
-    public IReadOnlyList<AbilityData> Abilities => abilities;
+    public IReadOnlyList<AbilityData> Abilities => State.Abilities;
 
     /// <summary>True from ability start until its effects (and later its animation) finish.</summary>
     public bool IsUsingAbility { get; private set; }
@@ -42,38 +48,40 @@ public class Unit : MonoBehaviour
     /// <summary>True while the unit is moving or using an ability; no new action may start.</summary>
     public bool IsActing => IsMoving || IsUsingAbility;
 
-    // ─── Events ──────────────────────────────────────────────────────────────
-    public static event Action<Unit> OnUnitPlaced;
-    public static event Action<Unit> OnUnitDied;
-    public static event Action<Unit> OnHealthChanged;
-
     // ─── Unity lifecycle ─────────────────────────────────────────────────────
     private void Awake()
     {
         _spriteRenderer = GetComponent<SpriteRenderer>();
-        CurrentHp = maxHp;
     }
 
-    // ─── Ownership ───────────────────────────────────────────────────────────
-    public void SetOwner(PlayerID ownerID)
+    private void OnDestroy()
     {
-        OwnerID = ownerID;
-        ApplyOwnerColor();
+        if (State == null) return;
+        State.HealthChanged -= HandleHealthChanged;
+        State.Died -= HandleDied;
     }
 
-    private void ApplyOwnerColor() // TODO: Remove when using a proper material system for units
+    // ─── Setup ───────────────────────────────────────────────────────────────
+    /// <summary>Creates the unit's state from its configured stats and links it to the grid. Call before placing it.</summary>
+    public void Init(PlayerID ownerID, Color ownerColor, GridManager grid)
+    {
+        _grid = grid;
+        State = new UnitState(ownerID, maxHp, abilities.ToArray());
+        State.HealthChanged += HandleHealthChanged;
+        State.Died += HandleDied;
+        _grid.RegisterUnitView(this);
+        ApplyOwnerColor(ownerColor);
+    }
+
+    private void ApplyOwnerColor(Color color) // TODO: Remove when using a proper material system for units
     {
         if (_spriteRenderer == null)
             _spriteRenderer = GetComponent<SpriteRenderer>();
 
-        if (_spriteRenderer != null && PlayerManager.Instance != null)
+        if (_spriteRenderer != null)
         {
-            Player owner = PlayerManager.Instance.GetPlayer(OwnerID);
-            if (owner != null)
-            {
-                _spriteRenderer.color = owner.Color;
-                unitColor = owner.Color;
-            }
+            _spriteRenderer.color = color;
+            unitColor = color;
         }
     }
 
@@ -96,24 +104,19 @@ public class Unit : MonoBehaviour
     }
 
     // ─── Movement (System) ───────────────────────────────────────────────────
-    /// <summary>Teleport / spawn / system placement — does not fire OnUnitMoved.</summary>
-    public void PlaceOnTile(Tile targetTile, bool snap = true)
+    /// <summary>Snaps the view onto a tile after its state was placed there (spawn / teleport).</summary>
+    public void PlaceOnTile(Tile targetTile)
     {
-        if (CurrentTile != null) CurrentTile.OccupyingUnit = null;
-        CurrentTile = targetTile;
-        CurrentTile.OccupyingUnit = this;
-        if (snap) transform.position = targetTile.transform.position;
-        OnUnitPlaced?.Invoke(this);
+        transform.position = targetTile.transform.position;
     }
 
     // ─── Movement (Gameplay) ─────────────────────────────────────────────────
     /// <summary>
-    /// Player-initiated move. Logical position changes immediately,
-    /// the transform animates, then after a short pause <paramref name="onComplete"/> is invoked.
+    /// Animates the view to a tile after <see cref="Match.TryMove"/> has moved its state there,
+    /// then after a short pause invokes <paramref name="onComplete"/>.
     /// </summary>
     public void MoveToTile(Tile targetTile, Action onComplete = null)
     {
-        PlaceOnTile(targetTile, snap: false);
         StartCoroutine(AnimateMove(targetTile.transform.position, onComplete));
     }
 
@@ -133,51 +136,26 @@ public class Unit : MonoBehaviour
         onComplete?.Invoke();
     }
 
-    public bool CanMoveTo(Tile targetTile)
-    {
-        if (targetTile.OccupyingUnit != null) return false;
-        int deltaX = Mathf.Abs(CurrentTile.Coords.x - targetTile.Coords.x);
-        int deltaY = Mathf.Abs(CurrentTile.Coords.y - targetTile.Coords.y);
-        return (deltaX + deltaY) == 1;
-    }
-
     // ─── Abilities (Gameplay) ────────────────────────────────────────────────
     /// <summary>
-    /// Player-initiated ability use. Applies the effects, then invokes <paramref name="onComplete"/>.
+    /// Plays the ability after <see cref="Match.TryUseAbility"/> has applied it, then invokes <paramref name="onComplete"/>.
     /// </summary>
-    public void UseAbility(AbilityData ability, List<Tile> targetTiles, Action onComplete = null)
+    public void PlayAbility(Action onComplete = null)
     {
         // shortcut: no ability animation yet, so this finishes in the same frame; turn it into a coroutine like AnimateMove when animations exist
         IsUsingAbility = true;
-        ability.Execute(this, targetTiles);
         IsUsingAbility = false;
         onComplete?.Invoke();
     }
 
-    // ─── Health Modification ──────────────────────────────────────────────────────────────
-    public void TakeDamage(int amount)
-    {
-        if (amount <= 0) return;
-        CurrentHp = Mathf.Max(0, CurrentHp - amount);
-        Debug.Log($"{name} took {amount} damage — HP: {CurrentHp}/{MaxHp}");
-        OnHealthChanged?.Invoke(this);
-        if (CurrentHp <= 0) Die();
-    }
+    // ─── Health ──────────────────────────────────────────────────────────────
+    private void HandleHealthChanged(UnitState state) => Debug.Log($"{name} HP: {CurrentHp}/{MaxHp}");
 
-    public void Heal(int amount)
-    {
-        if (amount <= 0) return;
-        CurrentHp = Mathf.Min(MaxHp, CurrentHp + amount);
-        Debug.Log($"{name} healed {amount} — HP: {CurrentHp}/{MaxHp}");
-        OnHealthChanged?.Invoke(this);
-    }
-
-    private void Die()
+    private void HandleDied(UnitState state)
     {
         Debug.Log($"{name} died.");
-        TurnManager.Instance.UnregisterUnit(this);
-        OnUnitDied?.Invoke(this);
-        if (CurrentTile != null) CurrentTile.OccupyingUnit = null;
+        // Match removes the state from the board and turn order; this only tears down the view
+        _grid.UnregisterUnitView(this);
         Destroy(gameObject);
     }
 }

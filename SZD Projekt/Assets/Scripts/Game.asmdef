@@ -2,6 +2,7 @@
     "name": "Game",
     "rootNamespace": "",
     "references": [
+        "Core",
         "Unity.TextMeshPro",
         "UnityEngine.UI"
     ],

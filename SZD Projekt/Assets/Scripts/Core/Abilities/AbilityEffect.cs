@@ -8,8 +8,8 @@ using System.Collections.Generic;
 public abstract class AbilityEffect : ScriptableObject
 {
     /// <summary>
-    /// Apply the effect to all resolved target tiles.
+    /// Apply the effect to all resolved target cells.
     /// The caster is provided so effects can use origin info (e.g. knockback direction).
     /// </summary>
-    public abstract void Apply(Unit caster, List<Tile> targetTiles);
+    public abstract void Apply(Match match, UnitState caster, IReadOnlyList<Vector2Int> targets);
 }
