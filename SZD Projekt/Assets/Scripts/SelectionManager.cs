@@ -22,7 +22,9 @@ public class SelectionManager : MonoBehaviour
     // ─── Unity lifecycle ─────────────────────────────────────────────────────
     private void OnDestroy()
     {
-        if (_match != null) _match.Turns.TurnChanged -= HandleTurnChanged;
+        if (_match == null) return;
+        _match.Turns.TurnChanged -= HandleTurnChanged;
+        _match.Turns.PhaseChanged -= HandlePhaseChanged;
     }
 
     // ─── Public API ──────────────────────────────────────────────────────────
@@ -33,6 +35,7 @@ public class SelectionManager : MonoBehaviour
         _match = match;
         _grid = grid;
         _match.Turns.TurnChanged += HandleTurnChanged;
+        _match.Turns.PhaseChanged += HandlePhaseChanged;
     }
 
     /// <summary>The currently selected unit, or null when nothing is selected.</summary>
@@ -41,7 +44,7 @@ public class SelectionManager : MonoBehaviour
     /// <summary>Processes a tile click using the current selection and interaction state.</summary>
     public void HandleTileClicked(Tile clickedTile)
     {
-        if (_match.Turns.IsGameOver) return;
+        if (_match.Turns.Phase != CyclePhase.Acting) return;
 
         // No unit selected — only allow clicking the active unit to select it
         if (_selectedUnit == null)
@@ -115,6 +118,12 @@ public class SelectionManager : MonoBehaviour
         _currentState?.Exit();
         _currentState = newState;
         _currentState.Enter(_selectedUnit);
+    }
+
+    // Outside Acting there is no active unit, so drop the finished one (this also hides the ActionBarUI)
+    private void HandlePhaseChanged(CyclePhase phase)
+    {
+        if (phase != CyclePhase.Acting) Deselect();
     }
 
     /// <summary>Selects the next active unit when the turn changes.</summary>

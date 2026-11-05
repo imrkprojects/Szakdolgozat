@@ -25,6 +25,14 @@ public class MatchTests
         return unit;
     }
 
+    // Starts the match and commits both players' units in the order they were added
+    private void StartAndCommit()
+    {
+        _match.Start();
+        _match.Turns.CommitPlan(PlayerID.Player1, _match.Turns.GetLivingUnits(PlayerID.Player1));
+        _match.Turns.CommitPlan(PlayerID.Player2, _match.Turns.GetLivingUnits(PlayerID.Player2));
+    }
+
     // Range-1 diamond ability that deals 4 damage; ScriptableObjects are destroyed in TearDown
     private AbilityData Strike()
     {
@@ -96,10 +104,10 @@ public class MatchTests
         UnitState p1B = AddUnit(PlayerID.Player1, 1, 0);
         UnitState p1C = AddUnit(PlayerID.Player1, 2, 0);
         AddUnit(PlayerID.Player2, 0, 4);
-        _match.Start();
+        StartAndCommit();
 
         p1B.TakeDamage(10);
-        _match.EndTurn(); // P2
+        _match.EndTurn(); // P2's unit
         _match.EndTurn();
 
         Assert.AreSame(p1C, _match.Turns.ActiveUnit);
@@ -112,7 +120,7 @@ public class MatchTests
         UnitState enemy = AddUnit(PlayerID.Player2, 0, 4);
         PlayerID? winner = null;
         _match.Turns.GameOver += w => winner = w;
-        _match.Start();
+        StartAndCommit();
 
         enemy.TakeDamage(10);
         _match.EndTurn();
@@ -137,7 +145,7 @@ public class MatchTests
     {
         UnitState unit = AddUnit(PlayerID.Player1, 0, 0);
         AddUnit(PlayerID.Player2, 4, 4);
-        _match.Start();
+        StartAndCommit();
 
         Assert.IsTrue(_match.TryMove(unit, new Vector2Int(0, 1)));
         Assert.AreEqual(new Vector2Int(0, 1), unit.Position);
@@ -149,7 +157,7 @@ public class MatchTests
     {
         UnitState unit = AddUnit(PlayerID.Player1, 0, 0);
         AddUnit(PlayerID.Player2, 4, 4);
-        _match.Start();
+        StartAndCommit();
 
         Assert.IsFalse(_match.TryMove(unit, new Vector2Int(1, 1)));
         Assert.AreEqual(Vector2Int.zero, unit.Position);
@@ -160,9 +168,21 @@ public class MatchTests
     {
         AddUnit(PlayerID.Player1, 0, 0);
         UnitState enemy = AddUnit(PlayerID.Player2, 4, 4);
-        _match.Start();
+        StartAndCommit();
 
         Assert.IsFalse(_match.TryMove(enemy, new Vector2Int(4, 3)));
+    }
+
+    [Test]
+    public void TryMove_SecondActionBeforeEndTurn_Rejected()
+    {
+        UnitState unit = AddUnit(PlayerID.Player1, 0, 0);
+        UnitState enemy = AddUnit(PlayerID.Player2, 4, 4);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryMove(unit, new Vector2Int(0, 1)));
+        Assert.IsFalse(_match.TryMove(unit, new Vector2Int(0, 2)));
+        Assert.AreEqual(new Vector2Int(0, 1), unit.Position);
     }
 
     [Test]
@@ -170,7 +190,7 @@ public class MatchTests
     {
         UnitState unit = AddUnit(PlayerID.Player1, 0, 0);
         UnitState enemy = AddUnit(PlayerID.Player2, 4, 4);
-        _match.Start();
+        StartAndCommit();
         enemy.TakeDamage(10);
         _match.EndTurn();
 
@@ -185,7 +205,7 @@ public class MatchTests
         AbilityData strike = Strike();
         UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
         UnitState enemy = AddUnit(PlayerID.Player2, 2, 3);
-        _match.Start();
+        StartAndCommit();
 
         Assert.IsTrue(_match.TryUseAbility(caster, strike, enemy.Position));
         Assert.AreEqual(6, enemy.Hp);
@@ -199,7 +219,7 @@ public class MatchTests
         UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
         UnitState ally = AddUnit(PlayerID.Player1, 2, 3);
         AddUnit(PlayerID.Player2, 4, 4);
-        _match.Start();
+        StartAndCommit();
 
         Assert.IsFalse(_match.TryUseAbility(caster, strike, ally.Position));
         Assert.IsFalse(_match.TryUseAbility(caster, strike, new Vector2Int(1, 2)));
@@ -212,7 +232,7 @@ public class MatchTests
         AbilityData strike = Strike();
         UnitState caster = AddUnit(PlayerID.Player1, 0, 0, strike);
         UnitState enemy = AddUnit(PlayerID.Player2, 4, 4);
-        _match.Start();
+        StartAndCommit();
 
         Assert.IsFalse(_match.TryUseAbility(caster, strike, enemy.Position));
         Assert.AreEqual(10, enemy.Hp);
@@ -224,7 +244,7 @@ public class MatchTests
         AbilityData strike = Strike();
         UnitState caster = AddUnit(PlayerID.Player1, 2, 2);
         UnitState enemy = AddUnit(PlayerID.Player2, 2, 3);
-        _match.Start();
+        StartAndCommit();
 
         Assert.IsFalse(_match.TryUseAbility(caster, strike, enemy.Position));
         Assert.AreEqual(10, enemy.Hp);
@@ -236,7 +256,7 @@ public class MatchTests
         AbilityData strike = Strike();
         UnitState target = AddUnit(PlayerID.Player1, 2, 2);
         UnitState enemy = AddUnit(PlayerID.Player2, 2, 3, strike);
-        _match.Start();
+        StartAndCommit();
 
         Assert.IsFalse(_match.TryUseAbility(enemy, strike, target.Position));
         Assert.AreEqual(10, target.Hp);

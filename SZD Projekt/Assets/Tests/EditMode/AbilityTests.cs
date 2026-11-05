@@ -151,6 +151,8 @@ public class AbilityTests
         UnitState caster = AddUnit(PlayerID.Player1, 4, 4);
         UnitState enemy = AddUnit(PlayerID.Player2, 4, 5, hp: 10);
         _match.Start();
+        _match.Turns.CommitPlan(PlayerID.Player1, new[] { caster });
+        _match.Turns.CommitPlan(PlayerID.Player2, new[] { enemy });
 
         Ability(null, Damage(10)).Execute(_match, caster, new[] { enemy.Position });
         _match.EndTurn();

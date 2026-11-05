@@ -46,6 +46,7 @@ public class Match
     public bool TryMove(UnitState unit, Vector2Int to)
     {
         if (!CanAct(unit) || !Board.CanMoveTo(unit, to)) return false;
+        Turns.BeginAction();
         Board.Place(unit, to);
         return true;
     }
@@ -66,13 +67,16 @@ public class Match
         UnitState occupant = Board.GetUnitAt(target);
         if (occupant == null || occupant.Owner == unit.Owner) return false;
 
+        // Before the effects, so a death caused by this action is recorded after the unit left its queue
+        Turns.BeginAction();
         ability.Execute(this, unit, new[] { target });
         return true;
     }
 
     // ─── Internal ────────────────────────────────────────────────────────────
 
-    private bool CanAct(UnitState unit) => !Turns.IsGameOver && unit == Turns.ActiveUnit;
+    // ActiveUnit is null outside Acting; a unit that has started gets no second action before EndTurn
+    private bool CanAct(UnitState unit) => unit != null && unit == Turns.ActiveUnit && !Turns.HasActiveUnitStarted;
 
     private void HandleUnitDied(UnitState unit)
     {

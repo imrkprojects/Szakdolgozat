@@ -13,6 +13,7 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private ActionBarUI actionBarUI;
     [SerializeField] private GameOverUI gameOverUI;
     [SerializeField] private PlayerStatusUI playerStatusUI;
+    [SerializeField] private TurnOrderUI turnOrderUI;
 
     /// <summary>The running match; exposed for PlayMode tests.</summary>
     public Match Match { get; private set; }
@@ -21,7 +22,11 @@ public class GameBootstrap : MonoBehaviour
     {
         Match = new Match(grid.Width, grid.Height);
         Debug.Log($"Players initialized: {Match.Player1.Name} vs {Match.Player2.Name}");
-        grid.BuildGrid(Match.Board, selectionManager.HandleTileClicked);
+        // The turn order panel is IMGUI, which tile clicks don't see, so clicks on it are dropped here
+        grid.BuildGrid(Match.Board, tile =>
+        {
+            if (!turnOrderUI.IsPointerOverPanel) selectionManager.HandleTileClicked(tile);
+        });
 
         // Everything that reacts to selection or turns subscribes before the match starts and fires the first turn
         selectionManager.Init(Match, grid);
@@ -29,6 +34,7 @@ public class GameBootstrap : MonoBehaviour
         actionBarUI.Init(selectionManager);
         gameOverUI.Init(Match, selectionManager);
         playerStatusUI.Init(Match);
+        turnOrderUI.Init(Match, grid);
 
         SpawnInitialUnits();
         Match.Start();

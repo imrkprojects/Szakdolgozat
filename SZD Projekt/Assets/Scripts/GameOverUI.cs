@@ -36,7 +36,7 @@ public class GameOverUI : MonoBehaviour
     {
         // EndTurn skips OnTurnChanged on game over, so clear the selection and highlights here
         _selection.Deselect();
-        resultText.text = $"{_match.GetPlayer(winner).Name} wins!";
+        resultText.text = winner == PlayerID.None ? "Draw!" : $"{_match.GetPlayer(winner).Name} wins!";
         // TODO: Show scores once the score system exists
         overlay.SetActive(true);
     }
