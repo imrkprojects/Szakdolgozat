@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -5,9 +6,10 @@ using UnityEngine.UI;
 public class ActionBarUI : MonoBehaviour
 {
     [SerializeField] private GameObject panel; // ActionBarPanel
-    [SerializeField] private Button abilityButton; // AbilityButton
+    [SerializeField] private Button[] abilityButtons; // AbilityButton1..4, each calling OnAbilityClicked(its index)
 
     private SelectionManager _selection;
+    private Match _match;
     private Unit _unit;
 
     private void Awake()
@@ -15,10 +17,11 @@ public class ActionBarUI : MonoBehaviour
         panel.SetActive(false);
     }
 
-    /// <summary>Links the bar to the selection it shows and controls.</summary>
-    public void Init(SelectionManager selection)
+    /// <summary>Links the bar to the selection it shows and controls, and the match that decides which abilities are usable.</summary>
+    public void Init(SelectionManager selection, Match match)
     {
         _selection = selection;
+        _match = match;
         _selection.OnUnitSelected += HandleUnitSelected;
         _selection.OnUnitDeselected += HandleUnitDeselected;
     }
@@ -30,10 +33,22 @@ public class ActionBarUI : MonoBehaviour
         _selection.OnUnitDeselected -= HandleUnitDeselected;
     }
 
+    // Selection is renewed on every turn change, so this also refreshes the buttons after each action
     private void HandleUnitSelected(Unit unit)
     {
         _unit = unit;
-        abilityButton.interactable = unit.Abilities.Count > 0;
+        for (int i = 0; i < abilityButtons.Length; i++)
+        {
+            bool used = i < unit.Abilities.Count;
+            abilityButtons[i].gameObject.SetActive(used);
+            if (!used) continue;
+            AbilityData ability = unit.Abilities[i];
+            abilityButtons[i].interactable = _match.CanUseAbility(unit.State, ability);
+            int cooldown = unit.State.GetCooldown(ability);
+            abilityButtons[i].GetComponentInChildren<TMP_Text>().text =
+                cooldown > 0 ? $"{ability.abilityName} ({cooldown})" : ability.abilityName;
+        }
+
         panel.SetActive(true);
     }
 
@@ -46,10 +61,10 @@ public class ActionBarUI : MonoBehaviour
     /// <summary>Switches the selected unit to movement mode. Wire this to the Move button.</summary>
     public void OnMoveClicked() => _selection.EnterMoveMode();
 
-    /// <summary>Switches the selected unit to targeting with its first ability. Wire this to the Ability button.</summary>
-    public void OnAbilityClicked()
+    /// <summary>Switches the selected unit to targeting with the ability at <paramref name="index"/>. Wire each ability button with its index.</summary>
+    public void OnAbilityClicked(int index)
     {
-        if (_unit != null && _unit.Abilities.Count > 0)
-            _selection.EnterAbilityMode(_unit.Abilities[0]);
+        if (_unit != null && index < _unit.Abilities.Count)
+            _selection.EnterAbilityMode(_unit.Abilities[index]);
     }
 }

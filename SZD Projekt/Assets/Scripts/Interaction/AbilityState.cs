@@ -55,18 +55,16 @@ public class AbilityState : IInteractionState
         // Ignore input while the ability (or a move) plays
         if (_unit.IsActing) return;
 
-        // Clicked the unit's own tile → cancel back to move mode
-        if (clickedTile == _unit.CurrentTile)
-        {
-            _selectionManager.EnterMoveMode();
-            return;
-        }
-
         // Clicked a tile within ability range → execute the ability
         if (_targetableTiles != null && _targetableTiles.Contains(clickedTile))
         {
-            // Match rejects empty or friendly tiles — ignore the click so a misclick doesn't waste the turn
-            if (!_match.TryUseAbility(_unit.State, _ability, clickedTile.Coords)) return;
+            // Match rejects cells the ability can't target — ignore the click so a misclick doesn't waste the turn,
+            // except on the unit's own tile, which cancels back to move mode when it isn't a valid target
+            if (!_match.TryUseAbility(_unit.State, _ability, clickedTile.Coords))
+            {
+                if (clickedTile == _unit.CurrentTile) _selectionManager.EnterMoveMode();
+                return;
+            }
 
             // Brief visual feedback — mark the target tile
             clickedTile.SetHighlight(TileHighlightState.AbilityTarget);

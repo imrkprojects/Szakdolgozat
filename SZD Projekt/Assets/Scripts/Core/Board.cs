@@ -80,11 +80,46 @@ public class Board
         return result;
     }
 
-    /// <summary>True if the cell is on the board, empty, and one orthogonal step from the unit.</summary>
-    public bool CanMoveTo(UnitState unit, Vector2Int pos)
+    /// <summary>Cells the unit can walk to in at most <paramref name="range"/> orthogonal steps through empty cells (not its own cell).</summary>
+    public List<Vector2Int> GetReachable(UnitState unit, int range) =>
+        new List<Vector2Int>(SearchPaths(unit, range).Keys);
+
+    /// <summary>
+    /// Shortest walk from the unit to <paramref name="to"/> through empty cells, excluding the start and including the end,
+    /// or null if it is not reachable within <paramref name="range"/> steps.
+    /// </summary>
+    public List<Vector2Int> FindPath(UnitState unit, Vector2Int to, int range)
     {
-        if (!InBounds(pos) || GetUnitAt(pos) != null) return false;
-        Vector2Int delta = pos - unit.Position;
-        return Mathf.Abs(delta.x) + Mathf.Abs(delta.y) == 1;
+        Dictionary<Vector2Int, Vector2Int> cameFrom = SearchPaths(unit, range);
+        if (!cameFrom.ContainsKey(to)) return null;
+
+        var path = new List<Vector2Int>();
+        for (Vector2Int pos = to; pos != unit.Position; pos = cameFrom[pos]) path.Add(pos);
+        path.Reverse();
+        return path;
+    }
+
+    // Breadth-first search from the unit; maps every reachable cell to the cell it was reached from
+    private Dictionary<Vector2Int, Vector2Int> SearchPaths(UnitState unit, int range)
+    {
+        var cameFrom = new Dictionary<Vector2Int, Vector2Int>();
+        var frontier = new List<Vector2Int> { unit.Position };
+        for (int step = 0; step < range && frontier.Count > 0; step++)
+        {
+            var next = new List<Vector2Int>();
+            foreach (Vector2Int from in frontier)
+            {
+                foreach (Vector2Int pos in GetAdjacent(from))
+                {
+                    if (pos == unit.Position || cameFrom.ContainsKey(pos) || GetUnitAt(pos) != null) continue;
+                    cameFrom[pos] = from;
+                    next.Add(pos);
+                }
+            }
+
+            frontier = next;
+        }
+
+        return cameFrom;
     }
 }

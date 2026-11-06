@@ -161,4 +161,67 @@ public class AbilityTests
         Assert.IsNull(_match.Board.GetUnitAt(new Vector2Int(4, 5)));
         Assert.IsTrue(_match.Turns.IsGameOver);
     }
+
+    // ─── Target filters ──────────────────────────────────────────────────────
+
+    // Caster at (4,4) with an ally, an enemy and an empty cell around it
+    [TestCase(TargetFilter.Enemy, false, true, false, false)]
+    [TestCase(TargetFilter.Ally, true, false, false, true)]
+    [TestCase(TargetFilter.Self, false, false, false, true)]
+    [TestCase(TargetFilter.AnyUnit, true, true, false, true)]
+    [TestCase(TargetFilter.EmptyCell, false, false, true, false)]
+    public void IsValidTarget_MatchesFilter(TargetFilter filter, bool ally, bool enemy, bool empty, bool self)
+    {
+        UnitState caster = AddUnit(PlayerID.Player1, 4, 4);
+        AddUnit(PlayerID.Player1, 4, 5);
+        AddUnit(PlayerID.Player2, 5, 4);
+        AbilityData ability = Ability(null);
+        ability.targetFilter = filter;
+
+        Assert.AreEqual(ally, ability.IsValidTarget(_match.Board, caster, new Vector2Int(4, 5)), "ally");
+        Assert.AreEqual(enemy, ability.IsValidTarget(_match.Board, caster, new Vector2Int(5, 4)), "enemy");
+        Assert.AreEqual(empty, ability.IsValidTarget(_match.Board, caster, new Vector2Int(3, 4)), "empty");
+        Assert.AreEqual(self, ability.IsValidTarget(_match.Board, caster, new Vector2Int(4, 4)), "self");
+    }
+
+    [Test]
+    public void TargetFilter_DefaultsToEnemy()
+    {
+        Assert.AreEqual(TargetFilter.Enemy, Create<AbilityData>().targetFilter);
+    }
+
+    // ─── Heal ────────────────────────────────────────────────────────────────
+
+    private HealEffect Heal(int amount)
+    {
+        var effect = Create<HealEffect>();
+        SetField(effect, "amount", amount);
+        return effect;
+    }
+
+    [Test]
+    public void Heal_RestoresAlliesAndCaster_UpToMaxHp()
+    {
+        UnitState caster = AddUnit(PlayerID.Player1, 4, 4);
+        UnitState ally = AddUnit(PlayerID.Player1, 4, 5);
+        caster.TakeDamage(5);
+        ally.TakeDamage(20);
+
+        Heal(8).Apply(_match, caster, new[] { new Vector2Int(4, 4), new Vector2Int(4, 5) });
+
+        Assert.AreEqual(30, caster.Hp, "clamped to MaxHp");
+        Assert.AreEqual(18, ally.Hp);
+    }
+
+    [Test]
+    public void Heal_IgnoresEnemiesAndEmptyCells()
+    {
+        UnitState caster = AddUnit(PlayerID.Player1, 4, 4);
+        UnitState enemy = AddUnit(PlayerID.Player2, 5, 4);
+        enemy.TakeDamage(10);
+
+        Assert.DoesNotThrow(() =>
+            Heal(8).Apply(_match, caster, new[] { new Vector2Int(5, 4), new Vector2Int(3, 4) }));
+        Assert.AreEqual(20, enemy.Hp);
+    }
 }

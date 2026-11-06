@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c645d458019a4074dad85b95176a19eb, type: 3}
-  m_Name: DiamondTargeting
+  m_Name: StrikeTargeting
   m_EditorClassIdentifier: Assembly-CSharp::DiamondTargetingRule
   range: 2
   excludeSelf: 1

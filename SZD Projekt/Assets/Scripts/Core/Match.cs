@@ -34,18 +34,28 @@ public class Match
     public void Start() => Turns.Start();
 
     /// <summary>Call when the active unit has finished its action (including its animation).</summary>
-    public void EndTurn() => Turns.EndTurn();
+    public void EndTurn()
+    {
+        // A pass is a turn too, so cooldowns tick whether or not the unit acted
+        Turns.ActiveUnit?.TickCooldowns();
+        Turns.EndTurn();
+    }
 
     // ─── Movement ────────────────────────────────────────────────────────────
 
-    /// <summary>Cells the unit could move to from where it stands.</summary>
-    public List<Vector2Int> GetMoveTargets(UnitState unit) =>
-        Board.GetAdjacent(unit.Position).FindAll(pos => Board.CanMoveTo(unit, pos));
+    /// <summary>Cells the unit could move to from where it stands, within its move range.</summary>
+    public List<Vector2Int> GetMoveTargets(UnitState unit) => Board.GetReachable(unit, unit.MoveRange);
 
-    /// <summary>Moves the active unit if the move is legal. Does not end the turn.</summary>
-    public bool TryMove(UnitState unit, Vector2Int to)
+    /// <summary>
+    /// Moves the active unit if the move is legal and returns the cells it walked through (ending at
+    /// <paramref name="to"/>) for the view to animate. Does not end the turn.
+    /// </summary>
+    public bool TryMove(UnitState unit, Vector2Int to, out List<Vector2Int> path)
     {
-        if (!CanAct(unit) || !Board.CanMoveTo(unit, to)) return false;
+        path = null;
+        if (!CanAct(unit)) return false;
+        path = Board.FindPath(unit, to, unit.MoveRange);
+        if (path == null) return false;
         Turns.BeginAction();
         Board.Place(unit, to);
         return true;
@@ -57,19 +67,23 @@ public class Match
     public List<Vector2Int> GetAbilityTargets(UnitState unit, AbilityData ability) =>
         ability.GetTargetablePositions(Board, unit);
 
+    /// <summary>True if the unit may use the ability now (it owns it, may act, and it is off cooldown), ignoring targets.</summary>
+    public bool CanUseAbility(UnitState unit, AbilityData ability) =>
+        ability != null && CanAct(unit) && unit.Abilities.Contains(ability) && unit.GetCooldown(ability) == 0;
+
     /// <summary>Uses one of the active unit's abilities on a cell if it is legal. Does not end the turn.</summary>
     public bool TryUseAbility(UnitState unit, AbilityData ability, Vector2Int target)
     {
-        if (!CanAct(unit) || !unit.Abilities.Contains(ability)) return false;
+        if (!CanUseAbility(unit, ability)) return false;
         if (!GetAbilityTargets(unit, ability).Contains(target)) return false;
 
-        // Only enemy-occupied cells are valid, so a misclick on an empty or friendly cell doesn't waste the turn
-        UnitState occupant = Board.GetUnitAt(target);
-        if (occupant == null || occupant.Owner == unit.Owner) return false;
+        // A cell the ability can't affect is rejected, so a misclick doesn't waste the turn
+        if (!ability.IsValidTarget(Board, unit, target)) return false;
 
         // Before the effects, so a death caused by this action is recorded after the unit left its queue
         Turns.BeginAction();
         ability.Execute(this, unit, new[] { target });
+        unit.StartCooldown(ability);
         return true;
     }
 

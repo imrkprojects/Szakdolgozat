@@ -107,6 +107,3 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Unit
   unitID: 0
   unitColor: {r: 0, g: 0, b: 0, a: 0}
-  maxHp: 30
-  abilities:
-  - {fileID: 11400000, guid: fb85034e8f1484f44943ac32ea41e71b, type: 2}

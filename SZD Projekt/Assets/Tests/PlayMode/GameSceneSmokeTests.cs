@@ -22,17 +22,9 @@ public class GameSceneSmokeTests
         Match match = bootstrap.Match;
         Assert.IsNotNull(match, "GameBootstrap did not create a match");
 
-        int p1 = 0, p2 = 0;
-        for (int x = 0; x < match.Board.Width; x++)
-        for (int y = 0; y < match.Board.Height; y++)
-        {
-            UnitState unit = match.Board.GetUnitAt(new Vector2Int(x, y));
-            if (unit?.Owner == PlayerID.Player1) p1++;
-            else if (unit?.Owner == PlayerID.Player2) p2++;
-        }
-
-        Assert.AreEqual(3, p1);
-        Assert.AreEqual(3, p2);
+        // Each player gets one unit per lineup entry, in lineup order, with that type's HP
+        AssertSpawnedLineup(match, PlayerID.Player1, bootstrap.Player1Lineup);
+        AssertSpawnedLineup(match, PlayerID.Player2, bootstrap.Player2Lineup);
         Assert.AreEqual(CyclePhase.Planning, match.Turns.Phase);
         Assert.IsNull(match.Turns.ActiveUnit);
 
@@ -43,6 +35,32 @@ public class GameSceneSmokeTests
         Assert.IsFalse(match.Turns.IsGameOver);
         Assert.AreEqual(match.Turns.ActiveUnit, Object.FindAnyObjectByType<SelectionManager>().SelectedUnit.State,
             "SelectionManager did not select the first active unit");
+
+        // The action bar shows one labelled button per ability of the selected unit and hides the rest
+        IReadOnlyList<AbilityData> abilities = match.Turns.ActiveUnit.Abilities;
+        for (int i = 1; i <= 4; i++)
+        {
+            GameObject button = GameObject.Find($"AbilityButton{i}");
+            bool shouldShow = i <= abilities.Count;
+            Assert.AreEqual(shouldShow, button != null && button.activeInHierarchy, $"AbilityButton{i} visibility");
+            if (shouldShow)
+                Assert.AreEqual(abilities[i - 1].abilityName,
+                    button.GetComponentInChildren<TMPro.TMP_Text>().text, $"AbilityButton{i} label");
+        }
+    }
+
+    private static void AssertSpawnedLineup(Match match, PlayerID owner, IReadOnlyList<UnitData> lineup)
+    {
+        IReadOnlyList<UnitState> units = match.Turns.GetLivingUnits(owner);
+        Assert.Greater(lineup.Count, 0, $"{owner} has an empty lineup");
+        Assert.AreEqual(lineup.Count, units.Count, $"{owner} spawned the wrong number of units");
+        for (int i = 0; i < lineup.Count; i++)
+        {
+            Assert.AreEqual(lineup[i].maxHp, units[i].MaxHp, $"{owner} unit {i + 1} has the wrong HP");
+            Assert.AreEqual(lineup[i].moveRange, units[i].MoveRange, $"{owner} unit {i + 1} has the wrong move range");
+            Assert.AreSame(units[i], match.Board.GetUnitAt(units[i].Position),
+                $"{owner} unit {i + 1} is not on the board");
+        }
     }
 
     // Stands in for the M4 playtest: drives the real scene through Core, so view wiring errors fail the test

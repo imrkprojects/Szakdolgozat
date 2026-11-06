@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -146,33 +147,91 @@ public class BoardTests
     // ─── Movement rule ───────────────────────────────────────────────────────
 
     [Test]
-    public void CanMoveTo_EmptyOrthogonalNeighbour_True()
-    {
-        UnitState unit = PlaceUnit(2, 2);
-        Assert.IsTrue(_board.CanMoveTo(unit, new Vector2Int(2, 3)));
-    }
-
-    [Test]
-    public void CanMoveTo_OccupiedNeighbour_False()
+    public void GetReachable_RangeOne_IsFreeOrthogonalNeighbours()
     {
         UnitState unit = PlaceUnit(2, 2);
         PlaceUnit(3, 2, PlayerID.Player2);
-        Assert.IsFalse(_board.CanMoveTo(unit, new Vector2Int(3, 2)));
-    }
 
-    [TestCase(3, 3)] // diagonal
-    [TestCase(4, 2)] // two steps
-    [TestCase(2, 2)] // own cell
-    public void CanMoveTo_NotOneOrthogonalStep_False(int x, int y)
-    {
-        UnitState unit = PlaceUnit(2, 2);
-        Assert.IsFalse(_board.CanMoveTo(unit, new Vector2Int(x, y)));
+        CollectionAssert.AreEquivalent(
+            new[] { new Vector2Int(2, 3), new Vector2Int(2, 1), new Vector2Int(1, 2) },
+            _board.GetReachable(unit, 1));
     }
 
     [Test]
-    public void CanMoveTo_OutOfBounds_False()
+    public void GetReachable_RangeTwo_IsDiamondWithoutOwnCell()
+    {
+        UnitState unit = PlaceUnit(2, 1);
+
+        CollectionAssert.AreEquivalent(_board.GetInRange(new Vector2Int(2, 1), 2), _board.GetReachable(unit, 2));
+    }
+
+    [Test]
+    public void GetReachable_Corner_StaysInBounds()
     {
         UnitState unit = PlaceUnit(0, 0);
-        Assert.IsFalse(_board.CanMoveTo(unit, new Vector2Int(-1, 0)));
+
+        CollectionAssert.AreEquivalent(
+            new[] { new Vector2Int(1, 0), new Vector2Int(0, 1), new Vector2Int(2, 0), new Vector2Int(1, 1), new Vector2Int(0, 2) },
+            _board.GetReachable(unit, 2));
+    }
+
+    [Test]
+    public void GetReachable_DoesNotPassThroughUnits()
+    {
+        // Unit in the corner, walled in by an ally and an enemy: nothing is reachable however far it may go
+        UnitState unit = PlaceUnit(0, 0);
+        PlaceUnit(1, 0);
+        PlaceUnit(0, 1, PlayerID.Player2);
+
+        CollectionAssert.IsEmpty(_board.GetReachable(unit, 5));
+    }
+
+    [Test]
+    public void GetReachable_GoesAroundBlockers_CountingTheDetour()
+    {
+        // . . .     (2,2) is blocked, so (2,3) costs 4 steps around it, not 2
+        // . X .
+        // . U .
+        UnitState unit = PlaceUnit(2, 1);
+        PlaceUnit(2, 2, PlayerID.Player2);
+
+        Assert.IsFalse(_board.GetReachable(unit, 3).Contains(new Vector2Int(2, 3)));
+        Assert.IsTrue(_board.GetReachable(unit, 4).Contains(new Vector2Int(2, 3)));
+    }
+
+    [Test]
+    public void GetReachable_RangeZero_IsEmpty()
+    {
+        CollectionAssert.IsEmpty(_board.GetReachable(PlaceUnit(2, 2), 0));
+    }
+
+    [Test]
+    public void FindPath_ReturnsShortestStepsEndingAtTarget()
+    {
+        UnitState unit = PlaceUnit(2, 1);
+        PlaceUnit(2, 2, PlayerID.Player2);
+
+        List<Vector2Int> path = _board.FindPath(unit, new Vector2Int(2, 3), 4);
+
+        Assert.AreEqual(4, path.Count);
+        Assert.AreEqual(new Vector2Int(2, 3), path[path.Count - 1]);
+        Vector2Int previous = unit.Position;
+        foreach (Vector2Int step in path)
+        {
+            Assert.AreEqual(1, Mathf.Abs(step.x - previous.x) + Mathf.Abs(step.y - previous.y), "not one orthogonal step");
+            Assert.IsNull(_board.GetUnitAt(step), "walked through a unit");
+            previous = step;
+        }
+    }
+
+    [TestCase(2, 2)] // own cell
+    [TestCase(2, 3)] // occupied
+    [TestCase(-1, 1)] // out of bounds
+    public void FindPath_Unreachable_ReturnsNull(int x, int y)
+    {
+        UnitState unit = PlaceUnit(2, 2);
+        PlaceUnit(2, 3, PlayerID.Player2);
+
+        Assert.IsNull(_board.FindPath(unit, new Vector2Int(x, y), 1));
     }
 }

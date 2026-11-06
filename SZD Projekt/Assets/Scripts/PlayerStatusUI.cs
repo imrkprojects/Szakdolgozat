@@ -49,7 +49,7 @@ public class PlayerStatusUI : MonoBehaviour
         {
             if (unit.OwnerID != id) continue;
             string status = unit.State.IsAlive ? $"{unit.CurrentHp}/{unit.MaxHp} HP" : "Dead";
-            sb.AppendLine($"Unit {unit.unitID}: {status}");
+            sb.AppendLine($"{unit.unitID} {unit.Data.unitName}: {status}");
         }
 
         return sb.ToString();

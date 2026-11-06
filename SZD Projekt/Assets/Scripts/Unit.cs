@@ -24,8 +24,10 @@ public class Unit : MonoBehaviour
     // ─── Position ────────────────────────────────────────────────────────────
     public Tile CurrentTile => _grid.GetTile(State.Position);
 
+    /// <summary>Type config this unit was created from; set by <see cref="Init"/>.</summary>
+    public UnitData Data { get; private set; }
+
     // ─── Health ──────────────────────────────────────────────────────────────
-    [Header("Stats")] [SerializeField] private int maxHp = 30;
     public int MaxHp => State.MaxHp;
     public int CurrentHp => State.Hp;
 
@@ -37,8 +39,6 @@ public class Unit : MonoBehaviour
     public bool IsMoving { get; private set; }
 
     // ─── Abilities ────────────────────────────────────────────────────────────
-    [Header("Abilities")] [SerializeField] private List<AbilityData> abilities = new List<AbilityData>();
-
     /// <summary>Read-only view of the unit's ability list.</summary>
     public IReadOnlyList<AbilityData> Abilities => State.Abilities;
 
@@ -62,11 +62,18 @@ public class Unit : MonoBehaviour
     }
 
     // ─── Setup ───────────────────────────────────────────────────────────────
-    /// <summary>Creates the unit's state from its configured stats and links it to the grid. Call before placing it.</summary>
-    public void Init(PlayerID ownerID, Color ownerColor, GridManager grid)
+    /// <summary>Creates the unit's state from its type config and links it to the grid. Call before placing it.</summary>
+    public void Init(UnitData data, PlayerID ownerID, Color ownerColor, GridManager grid)
     {
         _grid = grid;
-        State = new UnitState(ownerID, maxHp, abilities.ToArray());
+        Data = data;
+        State = data.CreateState(ownerID);
+        if (data.sprite != null)
+        {
+            if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
+            _spriteRenderer.sprite = data.sprite;
+        }
+
         State.HealthChanged += HandleHealthChanged;
         State.Died += HandleDied;
         _grid.RegisterUnitView(this);
@@ -112,25 +119,30 @@ public class Unit : MonoBehaviour
 
     // ─── Movement (Gameplay) ─────────────────────────────────────────────────
     /// <summary>
-    /// Animates the view to a tile after <see cref="Match.TryMove"/> has moved its state there,
-    /// then after a short pause invokes <paramref name="onComplete"/>.
+    /// Animates the view step by step along <paramref name="path"/> after <c>Match.TryMove</c> has moved
+    /// its state to the last tile, then after a short pause invokes <paramref name="onComplete"/>.
     /// </summary>
-    public void MoveToTile(Tile targetTile, Action onComplete = null)
+    public void MoveAlongPath(IReadOnlyList<Tile> path, Action onComplete = null)
     {
-        StartCoroutine(AnimateMove(targetTile.transform.position, onComplete));
+        StartCoroutine(AnimateMove(path, onComplete));
     }
 
-    private IEnumerator AnimateMove(Vector3 target, Action onComplete)
+    private IEnumerator AnimateMove(IReadOnlyList<Tile> path, Action onComplete)
     {
         IsMoving = true;
-        Vector3 start = transform.position;
-        for (float t = 0f; t < moveDuration; t += Time.deltaTime)
+        foreach (Tile tile in path)
         {
-            transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t / moveDuration));
-            yield return null;
+            Vector3 start = transform.position;
+            Vector3 target = tile.transform.position;
+            for (float t = 0f; t < moveDuration; t += Time.deltaTime)
+            {
+                transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t / moveDuration));
+                yield return null;
+            }
+
+            transform.position = target;
         }
 
-        transform.position = target;
         yield return new WaitForSeconds(postMovePause);
         IsMoving = false;
         onComplete?.Invoke();

@@ -59,13 +59,13 @@ public class MoveState : IInteractionState
 
         // Clicked a valid move tile → move then end the turn
         Tile from = _unit.CurrentTile;
-        if (_match.TryMove(_unit.State, clickedTile.Coords))
+        if (_match.TryMove(_unit.State, clickedTile.Coords, out List<Vector2Int> path))
         {
             // The state has already moved, so CurrentTile is the new tile; clear the old one by hand
             from.SetHighlight(TileHighlightState.None);
             ClearHighlights();
             // The turn ends only once the animation (and pause) completes.
-            _unit.MoveToTile(clickedTile, _match.EndTurn);
+            _unit.MoveAlongPath(path.ConvertAll(_grid.GetTile), _match.EndTurn);
             _unit.CurrentTile.SetHighlight(TileHighlightState.Selected);
             _selectionManager.NotifySelectedUnitMoved(_unit);
             Debug.Log($"{_unit.name} moved to {_unit.CurrentTile.Coords}");

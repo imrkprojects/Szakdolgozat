@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 03d9b7434ed777740a6ae2e816839468, type: 3}
-  m_Name: NewAbility
+  m_Name: Strike
   m_EditorClassIdentifier: Assembly-CSharp::AbilityData
-  abilityName: Unnamed Ability
+  abilityName: Strike
   icon: {fileID: 0}
   targetingRule: {fileID: 11400000, guid: 135a51a86a5e47d4f8c2e73b7e5b8d55, type: 2}
   effects:

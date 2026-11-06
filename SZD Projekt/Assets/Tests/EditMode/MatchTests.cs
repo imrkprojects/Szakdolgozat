@@ -147,7 +147,7 @@ public class MatchTests
         AddUnit(PlayerID.Player2, 4, 4);
         StartAndCommit();
 
-        Assert.IsTrue(_match.TryMove(unit, new Vector2Int(0, 1)));
+        Assert.IsTrue(_match.TryMove(unit, new Vector2Int(0, 1), out _));
         Assert.AreEqual(new Vector2Int(0, 1), unit.Position);
         Assert.AreSame(unit, _match.Turns.ActiveUnit);
     }
@@ -159,8 +159,44 @@ public class MatchTests
         AddUnit(PlayerID.Player2, 4, 4);
         StartAndCommit();
 
-        Assert.IsFalse(_match.TryMove(unit, new Vector2Int(1, 1)));
+        Assert.IsFalse(_match.TryMove(unit, new Vector2Int(1, 1), out _));
         Assert.AreEqual(Vector2Int.zero, unit.Position);
+    }
+
+    [Test]
+    public void TryMove_WithinMoveRange_MovesAndReturnsPath()
+    {
+        var unit = new UnitState(PlayerID.Player1, 10, moveRange: 2);
+        _match.AddUnit(unit, Vector2Int.zero);
+        AddUnit(PlayerID.Player2, 4, 4);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryMove(unit, new Vector2Int(1, 1), out List<Vector2Int> path));
+        Assert.AreEqual(new Vector2Int(1, 1), unit.Position);
+        Assert.AreEqual(2, path.Count);
+        Assert.AreEqual(new Vector2Int(1, 1), path[1]);
+    }
+
+    [Test]
+    public void TryMove_BeyondMoveRange_Rejected()
+    {
+        var unit = new UnitState(PlayerID.Player1, 10, moveRange: 2);
+        _match.AddUnit(unit, Vector2Int.zero);
+        AddUnit(PlayerID.Player2, 4, 4);
+        StartAndCommit();
+
+        Assert.IsFalse(_match.TryMove(unit, new Vector2Int(2, 1), out List<Vector2Int> path));
+        Assert.IsNull(path);
+        Assert.AreEqual(Vector2Int.zero, unit.Position);
+    }
+
+    [Test]
+    public void GetMoveTargets_UsesUnitMoveRange()
+    {
+        var unit = new UnitState(PlayerID.Player1, 10, moveRange: 2);
+        _match.AddUnit(unit, Vector2Int.zero);
+
+        Assert.AreEqual(5, _match.GetMoveTargets(unit).Count);
     }
 
     [Test]
@@ -170,7 +206,7 @@ public class MatchTests
         UnitState enemy = AddUnit(PlayerID.Player2, 4, 4);
         StartAndCommit();
 
-        Assert.IsFalse(_match.TryMove(enemy, new Vector2Int(4, 3)));
+        Assert.IsFalse(_match.TryMove(enemy, new Vector2Int(4, 3), out _));
     }
 
     [Test]
@@ -180,8 +216,8 @@ public class MatchTests
         UnitState enemy = AddUnit(PlayerID.Player2, 4, 4);
         StartAndCommit();
 
-        Assert.IsTrue(_match.TryMove(unit, new Vector2Int(0, 1)));
-        Assert.IsFalse(_match.TryMove(unit, new Vector2Int(0, 2)));
+        Assert.IsTrue(_match.TryMove(unit, new Vector2Int(0, 1), out _));
+        Assert.IsFalse(_match.TryMove(unit, new Vector2Int(0, 2), out _));
         Assert.AreEqual(new Vector2Int(0, 1), unit.Position);
     }
 
@@ -194,7 +230,7 @@ public class MatchTests
         enemy.TakeDamage(10);
         _match.EndTurn();
 
-        Assert.IsFalse(_match.TryMove(unit, new Vector2Int(0, 1)));
+        Assert.IsFalse(_match.TryMove(unit, new Vector2Int(0, 1), out _));
     }
 
     // ─── Abilities ───────────────────────────────────────────────────────────
@@ -227,6 +263,32 @@ public class MatchTests
     }
 
     [Test]
+    public void TryUseAbility_AllyFilter_AcceptsAllyAndRejectsEnemy()
+    {
+        AbilityData support = Strike();
+        support.targetFilter = TargetFilter.Ally;
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, support);
+        UnitState ally = AddUnit(PlayerID.Player1, 2, 3);
+        UnitState enemy = AddUnit(PlayerID.Player2, 2, 1);
+        StartAndCommit();
+
+        Assert.IsFalse(_match.TryUseAbility(caster, support, enemy.Position));
+        Assert.IsTrue(_match.TryUseAbility(caster, support, ally.Position));
+    }
+
+    [Test]
+    public void TryUseAbility_EmptyCellFilter_AcceptsEmptyCell()
+    {
+        AbilityData blink = Strike();
+        blink.targetFilter = TargetFilter.EmptyCell;
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, blink);
+        AddUnit(PlayerID.Player2, 4, 4);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryUseAbility(caster, blink, new Vector2Int(1, 2)));
+    }
+
+    [Test]
     public void TryUseAbility_EnemyOutOfRange_Rejected()
     {
         AbilityData strike = Strike();
@@ -248,6 +310,128 @@ public class MatchTests
 
         Assert.IsFalse(_match.TryUseAbility(caster, strike, enemy.Position));
         Assert.AreEqual(10, enemy.Hp);
+    }
+
+    [Test]
+    public void CanUseAbility_ActiveUnitOwnedAbility_True()
+    {
+        AbilityData strike = Strike();
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
+        AddUnit(PlayerID.Player2, 4, 4);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.CanUseAbility(caster, strike));
+    }
+
+    [Test]
+    public void CanUseAbility_NotActiveNotOwnedOrNull_False()
+    {
+        AbilityData strike = Strike();
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2);
+        UnitState enemy = AddUnit(PlayerID.Player2, 4, 4, strike);
+        StartAndCommit();
+
+        Assert.IsFalse(_match.CanUseAbility(caster, strike), "ability not owned");
+        Assert.IsFalse(_match.CanUseAbility(enemy, strike), "not the active unit");
+        Assert.IsFalse(_match.CanUseAbility(caster, null), "no ability");
+    }
+
+    [Test]
+    public void CanUseAbility_AfterActing_False()
+    {
+        AbilityData strike = Strike();
+        UnitState caster = AddUnit(PlayerID.Player1, 0, 0, strike);
+        AddUnit(PlayerID.Player2, 4, 4);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryMove(caster, new Vector2Int(0, 1), out _));
+
+        Assert.IsFalse(_match.CanUseAbility(caster, strike));
+    }
+
+    // ─── Cooldowns ───────────────────────────────────────────────────────────
+
+    [Test]
+    public void Cooldown_BlocksForNextNOwnTurns_ThenReady()
+    {
+        AbilityData strike = Strike();
+        strike.cooldown = 2;
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
+        UnitState enemy = AddUnit(PlayerID.Player2, 2, 3);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryUseAbility(caster, strike, enemy.Position));
+        _match.EndTurn(); // caster's turn
+        _match.EndTurn(); // enemy's turn
+
+        Assert.AreSame(caster, _match.Turns.ActiveUnit);
+        Assert.AreEqual(2, caster.GetCooldown(strike));
+        Assert.IsFalse(_match.CanUseAbility(caster, strike), "1st own turn after use");
+        Assert.IsFalse(_match.TryUseAbility(caster, strike, enemy.Position));
+        _match.EndTurn();
+        _match.EndTurn();
+
+        Assert.AreEqual(1, caster.GetCooldown(strike));
+        Assert.IsFalse(_match.CanUseAbility(caster, strike), "2nd own turn after use");
+        _match.EndTurn();
+        _match.EndTurn();
+
+        Assert.AreEqual(0, caster.GetCooldown(strike));
+        Assert.IsTrue(_match.CanUseAbility(caster, strike), "3rd own turn after use");
+    }
+
+    [Test]
+    public void Cooldown_OtherUnitsTurns_DoNotTickIt()
+    {
+        AbilityData strike = Strike();
+        strike.cooldown = 2;
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
+        UnitState ally = AddUnit(PlayerID.Player1, 0, 0);
+        UnitState enemy = AddUnit(PlayerID.Player2, 2, 3);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryUseAbility(caster, strike, enemy.Position));
+        _match.EndTurn(); // caster
+        _match.EndTurn(); // enemy
+        Assert.AreSame(ally, _match.Turns.ActiveUnit);
+        _match.EndTurn(); // ally
+        _match.EndTurn(); // enemy
+
+        Assert.AreSame(caster, _match.Turns.ActiveUnit);
+        Assert.AreEqual(2, caster.GetCooldown(strike));
+    }
+
+    [Test]
+    public void Cooldown_Zero_NeverBlocks()
+    {
+        AbilityData strike = Strike();
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
+        UnitState enemy = AddUnit(PlayerID.Player2, 2, 3);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryUseAbility(caster, strike, enemy.Position));
+        _match.EndTurn();
+        _match.EndTurn();
+
+        Assert.AreEqual(0, caster.GetCooldown(strike));
+        Assert.IsTrue(_match.TryUseAbility(caster, strike, enemy.Position));
+    }
+
+    [Test]
+    public void Cooldown_ActiveUnitDiesDuringItsTurn_EndTurnStillWorks()
+    {
+        AbilityData strike = Strike();
+        strike.cooldown = 1;
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
+        AddUnit(PlayerID.Player1, 0, 0); // keeps Player 1 alive so the match goes on
+        UnitState enemy = AddUnit(PlayerID.Player2, 2, 3);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryUseAbility(caster, strike, enemy.Position));
+        caster.TakeDamage(10);
+
+        Assert.DoesNotThrow(() => _match.EndTurn());
+        Assert.AreSame(enemy, _match.Turns.ActiveUnit);
     }
 
     [Test]

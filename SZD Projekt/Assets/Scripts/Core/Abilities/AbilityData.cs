@@ -14,6 +14,14 @@ public class AbilityData : ScriptableObject
     [Header("Targeting")] [Tooltip("Defines the shape and range of tiles the player can aim the ability at.")]
     public TargetingRule targetingRule;
 
+    [Tooltip("Which cells in range the ability may actually be used on.")]
+    public TargetFilter targetFilter = TargetFilter.Enemy;
+
+    [Header("Cooldown")]
+    [Tooltip("After use, the unit can't use this ability for this many of its own turns. 0 = always ready.")]
+    [Min(0)]
+    public int cooldown;
+
     [Header("Effects — applied in order")] [Tooltip("Chain multiple effects: damage first, then knockback, etc.")]
     public AbilityEffect[] effects;
 
@@ -27,6 +35,21 @@ public class AbilityData : ScriptableObject
         }
 
         return targetingRule.GetTargetablePositions(board, caster);
+    }
+
+    /// <summary>True if what stands on <paramref name="cell"/> matches <see cref="targetFilter"/>. Range is checked separately.</summary>
+    public bool IsValidTarget(Board board, UnitState caster, Vector2Int cell)
+    {
+        UnitState occupant = board.GetUnitAt(cell);
+        switch (targetFilter)
+        {
+            case TargetFilter.Enemy: return occupant != null && occupant.Owner != caster.Owner;
+            case TargetFilter.Ally: return occupant != null && occupant.Owner == caster.Owner;
+            case TargetFilter.Self: return occupant == caster;
+            case TargetFilter.AnyUnit: return occupant != null;
+            case TargetFilter.EmptyCell: return occupant == null;
+            default: return false;
+        }
     }
 
     /// <summary>Executes all effects against the given target cells in order.</summary>

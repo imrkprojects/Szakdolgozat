@@ -21,6 +21,13 @@ public class UnitStateTests
     }
 
     [Test]
+    public void New_MoveRange_DefaultsToOne_AndRejectsNegative()
+    {
+        Assert.AreEqual(1, new UnitState(PlayerID.Player1, 30).MoveRange);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new UnitState(PlayerID.Player1, 30, moveRange: -1));
+    }
+
+    [Test]
     public void TakeDamage_ReducesHp_AndRaisesHealthChanged()
     {
         var unit = new UnitState(PlayerID.Player1, 30);

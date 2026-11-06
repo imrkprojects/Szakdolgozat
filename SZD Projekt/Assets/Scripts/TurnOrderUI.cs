@@ -207,5 +207,9 @@ public class TurnOrderUI : MonoBehaviour
         return $"<color=#{ColorUtility.ToHtmlStringRGB(player.Color)}>{player.Name}</color>";
     }
 
-    private string Label(UnitState unit) => $"Unit {_grid.GetUnitView(unit).unitID}";
+    private string Label(UnitState unit)
+    {
+        Unit view = _grid.GetUnitView(unit);
+        return $"{view.unitID} {view.Data.unitName}";
+    }
 }

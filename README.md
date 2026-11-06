@@ -1,9 +1,9 @@
 # SZD Projekt
 
-A turn-based tactics game on a square grid, made in Unity for a BSC thesis. Two players share one screen (hot-seat). Each has three units:
+A turn-based tactics game on a square grid, made in Unity for a BSC thesis. Two players share one screen (hot-seat). Each has a lineup of unit types (by default a Warrior, an Archer and a Healer), each with its own HP, move range and abilities:
 
 1. At the start, each player secretly plans the order in which their units will act.
-2. After that, the players strictly alternate turns. On each turn, the next unit in the player's order either moves one tile or uses an ability on an enemy.
+2. After that, the players strictly alternate turns. On each turn, the next unit in the player's order either moves (up to its move range) or uses one of its abilities. Some abilities have a cooldown.
 3. A player can change their order for free after one of their units dies, or by spending one of two tokens at the start of a cycle.
 
 The player who still has units when the other has none wins.
@@ -19,7 +19,7 @@ The player who still has units when the other has none wins.
 2. Open `Assets/Scenes/MainMenu.unity` to start from the menu, or `Assets/Scenes/GameScene.unity` to go straight to a match.
 3. Press **Play**.
 4. Plan: each player in turn presses "show my units", orders the units with ▲/▼, and presses Commit.
-5. Play: click a highlighted tile to move, or press the ability button and then click an enemy within the orange range.
+5. Play: click a highlighted tile to move, or press one of the ability buttons and then click a valid target (an enemy, or an ally for Heal) within the orange range.
 
 ## Running the tests
 
@@ -33,12 +33,13 @@ SZD Projekt/                     Unity project
 └── Assets/
     ├── Scenes/                  MainMenu, GameScene
     ├── Scripts/                 Game assembly: views, input, UI, GameBootstrap
-    │   ├── Core/                Core assembly: Match, Board, UnitState, TurnCycle, Player
-    │   │   └── Abilities/       AbilityData, TargetingRule, AbilityEffect and subclasses
+    │   ├── Core/                Core assembly: Match, Board, UnitState, UnitData, TurnCycle, Player
+    │   │   └── Abilities/       AbilityData, TargetFilter, TargetingRule, AbilityEffect and subclasses
     │   └── Interaction/         SelectionManager's MoveState / AbilityState
     ├── Tests/
     │   ├── EditMode/            Core unit tests
     │   └── PlayMode/            GameScene smoke tests
-    ├── UnitPrefab, TilePrefab   Prefabs
-    └── *.asset                  Example ability assets
+    ├── Units/                   Unit type assets (UnitData): Warrior, Archer, Healer
+    ├── Abilities/               Ability assets with their targeting rules and effects
+    └── UnitPrefab, TilePrefab   Prefabs
 ```

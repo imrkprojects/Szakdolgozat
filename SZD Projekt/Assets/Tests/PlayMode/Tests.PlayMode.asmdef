@@ -4,6 +4,7 @@
     "references": [
         "Core",
         "Game",
+        "Unity.TextMeshPro",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
