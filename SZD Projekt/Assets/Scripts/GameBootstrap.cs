@@ -48,6 +48,17 @@ public class GameBootstrap : MonoBehaviour
             if (!turnOrderUI.IsPointerOverPanel) selectionManager.HandleCellClicked(cell);
         });
 
+        // Before the units, so a wall painted on a spawn cell makes Board.Place throw
+        var structures = new List<StructureState>();
+        foreach ((Vector2Int cell, StructureData data) in grid.GetPaintedStructures())
+        {
+            StructureState structure = data.CreateState();
+            Match.AddStructure(structure, cell);
+            structures.Add(structure);
+        }
+
+        grid.TrackStructures(structures);
+
         // Everything that reacts to selection or turns subscribes before the match starts and fires the first turn
         selectionManager.Init(Match, grid);
         cameraController.Init(grid, selectionManager);

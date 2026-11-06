@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f0d6088e36c17447b2820d0b3fe7de6, type: 3}
+  m_Name: WoodenWallTile
+  m_EditorClassIdentifier: Game::StructureTile
+  data: {fileID: 11400000, guid: ac243549d2dc8da42801ff2b3151c69e, type: 2}

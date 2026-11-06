@@ -20,6 +20,7 @@ public class GridManager : MonoBehaviour
 
     [Header("Scene")] [SerializeField] private Grid grid;
     [SerializeField] private Tilemap groundMap;
+    [SerializeField] private Tilemap structureTilemap; // painted in the editor with StructureTiles
     [SerializeField] private Tilemap highlightMap;
     [SerializeField] private SpriteRenderer hoverMarker;
     [SerializeField] private Camera cam;
@@ -36,6 +37,7 @@ public class GridManager : MonoBehaviour
         new Dictionary<Vector2Int, TileHighlightState>();
 
     private readonly Dictionary<UnitState, Unit> _unitViews = new Dictionary<UnitState, Unit>();
+    private readonly List<StructureState> _structures = new List<StructureState>();
     private Action<Vector2Int> _onCellClicked;
 
     /// <summary>Game state of the grid; set by <see cref="BuildGrid"/>.</summary>
@@ -77,6 +79,46 @@ public class GridManager : MonoBehaviour
         grid.transform.position = new Vector3(-0.5f, -0.5f, 0f);
         GenerateGrid();
         Debug.Log($"Grid generated with dimensions {Board.Width} x {Board.Height}.");
+    }
+
+    /// <summary>Structures painted on the structure Tilemap, by board cell. Cells off the board are skipped with a warning.</summary>
+    public List<(Vector2Int cell, StructureData data)> GetPaintedStructures()
+    {
+        var result = new List<(Vector2Int, StructureData)>();
+        foreach (Vector3Int pos in structureTilemap.cellBounds.allPositionsWithin)
+        {
+            var tile = structureTilemap.GetTile<StructureTile>(pos);
+            if (tile == null) continue;
+            var cell = (Vector2Int)pos;
+            if (!Board.InBounds(cell) || tile.data == null)
+            {
+                Debug.LogWarning($"GridManager: structure tile '{tile.name}' at {cell} is off the board " +
+                                 "or has no StructureData; skipped.");
+                continue;
+            }
+
+            result.Add((cell, tile.data));
+        }
+
+        return result;
+    }
+
+    /// <summary>Clears each structure's tile when it is destroyed.</summary>
+    public void TrackStructures(IEnumerable<StructureState> structures)
+    {
+        foreach (StructureState structure in structures)
+        {
+            structure.Destroyed += HandleStructureDestroyed;
+            _structures.Add(structure);
+        }
+    }
+
+    private void HandleStructureDestroyed(StructureState structure) =>
+        structureTilemap.SetTile((Vector3Int)structure.Position, null);
+
+    private void OnDestroy()
+    {
+        foreach (StructureState structure in _structures) structure.Destroyed -= HandleStructureDestroyed;
     }
 
     /// <summary>World position of the center of the given cell.</summary>

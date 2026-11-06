@@ -7,8 +7,40 @@ public class BoardTests
 {
     private Board _board;
 
+    private readonly List<StructureData> _created = new List<StructureData>();
+
     [SetUp]
     public void SetUp() => _board = new Board(5, 4);
+
+    [TearDown]
+    public void TearDown()
+    {
+        foreach (StructureData data in _created) UnityEngine.Object.DestroyImmediate(data);
+        _created.Clear();
+    }
+
+    // A wall blocks movement; a bush (blocksMovement = false) doesn't
+    private StructureState NewStructure(bool blocksMovement)
+    {
+        var data = ScriptableObject.CreateInstance<StructureData>();
+        data.blocksMovement = blocksMovement;
+        _created.Add(data);
+        return data.CreateState();
+    }
+
+    private StructureState PlaceWall(int x, int y)
+    {
+        StructureState wall = NewStructure(true);
+        _board.PlaceStructure(wall, new Vector2Int(x, y));
+        return wall;
+    }
+
+    private StructureState PlaceBush(int x, int y)
+    {
+        StructureState bush = NewStructure(false);
+        _board.PlaceStructure(bush, new Vector2Int(x, y));
+        return bush;
+    }
 
     private UnitState PlaceUnit(int x, int y, PlayerID owner = PlayerID.Player1)
     {
@@ -171,7 +203,11 @@ public class BoardTests
         UnitState unit = PlaceUnit(0, 0);
 
         CollectionAssert.AreEquivalent(
-            new[] { new Vector2Int(1, 0), new Vector2Int(0, 1), new Vector2Int(2, 0), new Vector2Int(1, 1), new Vector2Int(0, 2) },
+            new[]
+            {
+                new Vector2Int(1, 0), new Vector2Int(0, 1), new Vector2Int(2, 0), new Vector2Int(1, 1),
+                new Vector2Int(0, 2)
+            },
             _board.GetReachable(unit, 2));
     }
 
@@ -218,7 +254,8 @@ public class BoardTests
         Vector2Int previous = unit.Position;
         foreach (Vector2Int step in path)
         {
-            Assert.AreEqual(1, Mathf.Abs(step.x - previous.x) + Mathf.Abs(step.y - previous.y), "not one orthogonal step");
+            Assert.AreEqual(1, Mathf.Abs(step.x - previous.x) + Mathf.Abs(step.y - previous.y),
+                "not one orthogonal step");
             Assert.IsNull(_board.GetUnitAt(step), "walked through a unit");
             previous = step;
         }
@@ -233,5 +270,120 @@ public class BoardTests
         PlaceUnit(2, 3, PlayerID.Player2);
 
         Assert.IsNull(_board.FindPath(unit, new Vector2Int(x, y), 1));
+    }
+
+    // ─── Structures ──────────────────────────────────────────────────────────
+
+    [Test]
+    public void PlaceStructure_SetsStructureAndPosition()
+    {
+        StructureState wall = PlaceWall(1, 2);
+
+        Assert.AreSame(wall, _board.GetStructureAt(new Vector2Int(1, 2)));
+        Assert.AreEqual(new Vector2Int(1, 2), wall.Position);
+        Assert.IsNull(_board.GetStructureAt(new Vector2Int(2, 2)));
+    }
+
+    [Test]
+    public void RemoveStructure_FreesCell_AndIgnoresStructuresNotOnBoard()
+    {
+        StructureState wall = PlaceWall(1, 2);
+        _board.RemoveStructure(wall);
+        Assert.IsNull(_board.GetStructureAt(new Vector2Int(1, 2)));
+
+        StructureState placed = PlaceWall(0, 0);
+        Assert.DoesNotThrow(() => _board.RemoveStructure(NewStructure(true))); // Position defaults to (0, 0)
+        Assert.AreSame(placed, _board.GetStructureAt(Vector2Int.zero));
+    }
+
+    [Test]
+    public void PlaceStructure_OutOfBounds_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            _board.PlaceStructure(NewStructure(true), new Vector2Int(5, 0)));
+    }
+
+    [Test]
+    public void PlaceStructure_OnCellWithStructure_Throws()
+    {
+        PlaceBush(1, 1);
+        Assert.Throws<InvalidOperationException>(() => _board.PlaceStructure(NewStructure(true), new Vector2Int(1, 1)));
+    }
+
+    [Test]
+    public void PlaceStructure_WallOnUnit_Throws_BushOnUnitWorks()
+    {
+        PlaceUnit(1, 1);
+
+        Assert.Throws<InvalidOperationException>(() => _board.PlaceStructure(NewStructure(true), new Vector2Int(1, 1)));
+        Assert.DoesNotThrow(() => _board.PlaceStructure(NewStructure(false), new Vector2Int(1, 1)));
+    }
+
+    [Test]
+    public void Place_OntoWall_Throws_OntoBushWorks()
+    {
+        PlaceWall(1, 1);
+        PlaceBush(2, 1);
+        var unit = new UnitState(PlayerID.Player1, 10);
+
+        Assert.Throws<InvalidOperationException>(() => _board.Place(unit, new Vector2Int(1, 1)));
+        _board.Place(unit, new Vector2Int(2, 1));
+        Assert.AreSame(unit, _board.GetUnitAt(new Vector2Int(2, 1)));
+    }
+
+    [Test]
+    public void IsWalkable_FalseForWallUnitAndOutOfBounds_TrueForEmptyAndBush()
+    {
+        PlaceWall(1, 1);
+        PlaceBush(2, 1);
+        PlaceUnit(3, 1);
+
+        Assert.IsFalse(_board.IsWalkable(new Vector2Int(1, 1)), "wall");
+        Assert.IsTrue(_board.IsWalkable(new Vector2Int(2, 1)), "bush");
+        Assert.IsFalse(_board.IsWalkable(new Vector2Int(3, 1)), "unit");
+        Assert.IsTrue(_board.IsWalkable(new Vector2Int(0, 0)), "empty");
+        Assert.IsFalse(_board.IsWalkable(new Vector2Int(-1, 0)), "out of bounds");
+    }
+
+    [Test]
+    public void GetReachable_DoesNotEnterWalls_ButGoesThroughBushes()
+    {
+        UnitState unit = PlaceUnit(2, 1);
+        PlaceWall(2, 2);
+        PlaceBush(1, 1);
+
+        List<Vector2Int> reachable = _board.GetReachable(unit, 2);
+
+        CollectionAssert.DoesNotContain(reachable, new Vector2Int(2, 2));
+        CollectionAssert.Contains(reachable, new Vector2Int(1, 1));
+        CollectionAssert.Contains(reachable, new Vector2Int(0, 1)); // through the bush
+    }
+
+    [Test]
+    public void GetReachable_GoesAroundWalls_CountingTheDetour()
+    {
+        UnitState unit = PlaceUnit(2, 1);
+        PlaceWall(2, 2);
+
+        Assert.IsFalse(_board.GetReachable(unit, 3).Contains(new Vector2Int(2, 3)));
+        Assert.IsTrue(_board.GetReachable(unit, 4).Contains(new Vector2Int(2, 3)));
+    }
+
+    [Test]
+    public void FindPath_ToWallCell_ReturnsNull()
+    {
+        UnitState unit = PlaceUnit(2, 1);
+        PlaceWall(2, 2);
+
+        Assert.IsNull(_board.FindPath(unit, new Vector2Int(2, 2), 5));
+    }
+
+    [Test]
+    public void GetInRange_IgnoresWalls()
+    {
+        List<Vector2Int> before = _board.GetInRange(new Vector2Int(2, 1), 2);
+        PlaceWall(2, 2);
+
+        CollectionAssert.AreEquivalent(before, _board.GetInRange(new Vector2Int(2, 1), 2));
     }
 }

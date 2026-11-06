@@ -43,11 +43,13 @@ public class AbilityData : ScriptableObject
         UnitState occupant = board.GetUnitAt(cell);
         switch (targetFilter)
         {
-            case TargetFilter.Enemy: return occupant != null && occupant.Owner != caster.Owner;
+            case TargetFilter.Enemy:
+                return (occupant != null && occupant.Owner != caster.Owner)
+                       || board.GetStructureAt(cell)?.Data.destructible == true;
             case TargetFilter.Ally: return occupant != null && occupant.Owner == caster.Owner;
             case TargetFilter.Self: return occupant == caster;
             case TargetFilter.AnyUnit: return occupant != null;
-            case TargetFilter.EmptyCell: return occupant == null;
+            case TargetFilter.EmptyCell: return board.IsWalkable(cell);
             default: return false;
         }
     }

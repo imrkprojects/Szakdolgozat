@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// Deals a fixed amount of damage to every enemy unit on the target tiles
+/// Deals a fixed amount of damage to every enemy unit and destructible structure on the target tiles
 /// (the caster and its allies are never hit).
 /// Create via: right-click → Create → Game → Ability Effects → Damage
 /// </summary>
@@ -21,6 +21,9 @@ public class DamageEffect : AbilityEffect
                 Debug.Log($"Unit at {pos} takes {damage} damage");
                 target.TakeDamage(damage);
             }
+
+            // Indestructible structures ignore the damage themselves
+            match.Board.GetStructureAt(pos)?.TakeDamage(damage);
         }
     }
 }

@@ -11,7 +11,7 @@ public class UnitState
     public bool IsAlive => Hp > 0;
     public IReadOnlyList<AbilityData> Abilities { get; }
 
-    /// <summary>How many orthogonal steps through empty cells the unit may take in one move.</summary>
+    /// <summary>How many orthogonal steps through walkable cells the unit may take in one move.</summary>
     public int MoveRange { get; }
 
     /// <summary>Board cell of the unit. Only <see cref="Board"/> changes it.</summary>

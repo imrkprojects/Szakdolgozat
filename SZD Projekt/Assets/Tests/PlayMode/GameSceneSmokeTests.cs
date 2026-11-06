@@ -36,8 +36,17 @@ public class GameSceneSmokeTests
         Assert.AreEqual(match.Turns.ActiveUnit, Object.FindAnyObjectByType<SelectionManager>().SelectedUnit.State,
             "SelectionManager did not select the first active unit");
 
-        // Selecting enters move mode: the overlay marks the unit's cell and every move target
+        // Every painted structure is on the board with its type, and no unit stands on a wall
         var grid = Object.FindAnyObjectByType<GridManager>();
+        List<(Vector2Int cell, StructureData data)> painted = grid.GetPaintedStructures();
+        Assert.IsNotEmpty(painted, "GameScene has no painted structures");
+        foreach ((Vector2Int cell, StructureData data) in painted)
+        {
+            Assert.AreSame(data, match.Board.GetStructureAt(cell)?.Data, $"structure at {cell} is not on the board");
+            if (data.blocksMovement) Assert.IsNull(match.Board.GetUnitAt(cell), $"a unit stands on the wall at {cell}");
+        }
+
+        // Selecting enters move mode: the overlay marks the unit's cell and every move target
         UnitState active = match.Turns.ActiveUnit;
         Assert.AreEqual(TileHighlightState.Selected, grid.GetHighlight(active.Position), "unit cell highlight");
         foreach (Vector2Int cell in match.GetMoveTargets(active))

@@ -31,6 +31,13 @@ public class Match
         unit.Died += HandleUnitDied;
     }
 
+    /// <summary>Puts a structure on the board and removes it when it is destroyed.</summary>
+    public void AddStructure(StructureState structure, Vector2Int pos)
+    {
+        Board.PlaceStructure(structure, pos);
+        structure.Destroyed += HandleStructureDestroyed;
+    }
+
     public void Start() => Turns.Start();
 
     /// <summary>Call when the active unit has finished its action (including its animation).</summary>
@@ -97,5 +104,12 @@ public class Match
         unit.Died -= HandleUnitDied;
         Board.Remove(unit);
         Turns.UnregisterUnit(unit);
+    }
+
+    // The cell becomes plain floor
+    private void HandleStructureDestroyed(StructureState structure)
+    {
+        structure.Destroyed -= HandleStructureDestroyed;
+        Board.RemoveStructure(structure);
     }
 }

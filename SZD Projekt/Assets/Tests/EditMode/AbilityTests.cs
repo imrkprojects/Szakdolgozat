@@ -184,6 +184,54 @@ public class AbilityTests
         Assert.AreEqual(self, ability.IsValidTarget(_match.Board, caster, new Vector2Int(4, 4)), "self");
     }
 
+    private StructureState AddStructure(int x, int y, bool blocksMovement, bool destructible)
+    {
+        var data = Create<StructureData>();
+        data.blocksMovement = blocksMovement;
+        data.destructible = destructible;
+        StructureState structure = data.CreateState();
+        _match.AddStructure(structure, new Vector2Int(x, y));
+        return structure;
+    }
+
+    [Test]
+    public void IsValidTarget_Enemy_AcceptsDestructibleWall_RejectsIndestructible()
+    {
+        UnitState caster = AddUnit(PlayerID.Player1, 4, 4);
+        AddStructure(4, 5, blocksMovement: true, destructible: true);
+        AddStructure(5, 4, blocksMovement: true, destructible: false);
+        AbilityData ability = Ability(null);
+
+        Assert.IsTrue(ability.IsValidTarget(_match.Board, caster, new Vector2Int(4, 5)), "destructible");
+        Assert.IsFalse(ability.IsValidTarget(_match.Board, caster, new Vector2Int(5, 4)), "indestructible");
+    }
+
+    [Test]
+    public void IsValidTarget_EmptyCell_RejectsWall_AcceptsEmptyBush()
+    {
+        UnitState caster = AddUnit(PlayerID.Player1, 4, 4);
+        AddStructure(4, 5, blocksMovement: true, destructible: false);
+        AddStructure(5, 4, blocksMovement: false, destructible: false);
+        AbilityData ability = Ability(null);
+        ability.targetFilter = TargetFilter.EmptyCell;
+
+        Assert.IsFalse(ability.IsValidTarget(_match.Board, caster, new Vector2Int(4, 5)), "wall");
+        Assert.IsTrue(ability.IsValidTarget(_match.Board, caster, new Vector2Int(5, 4)), "bush");
+    }
+
+    [Test]
+    public void Damage_HitsDestructibleWall_LeavesIndestructibleAtFullHp()
+    {
+        UnitState caster = AddUnit(PlayerID.Player1, 4, 4);
+        StructureState destructible = AddStructure(4, 5, blocksMovement: true, destructible: true);
+        StructureState indestructible = AddStructure(5, 4, blocksMovement: true, destructible: false);
+
+        Ability(null, Damage(3)).Execute(_match, caster, new[] { destructible.Position, indestructible.Position });
+
+        Assert.AreEqual(7, destructible.Hp);
+        Assert.AreEqual(10, indestructible.Hp);
+    }
+
     [Test]
     public void TargetFilter_DefaultsToEnemy()
     {

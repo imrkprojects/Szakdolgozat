@@ -14,7 +14,7 @@ public class UnitData : ScriptableObject
 
     [Header("Stats")] [Min(1)] public int maxHp = 30;
 
-    [Tooltip("Orthogonal steps through empty cells per move.")] [Min(0)]
+    [Tooltip("Orthogonal steps through walkable cells per move.")] [Min(0)]
     public int moveRange = 1;
 
     [Header("Abilities")] public AbilityData[] abilities = new AbilityData[0];

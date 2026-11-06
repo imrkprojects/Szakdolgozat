@@ -53,6 +53,18 @@ public class MatchTests
         return ability;
     }
 
+    // Adds a wall (blocks movement) to the match; ScriptableObjects are destroyed in TearDown
+    private StructureState AddWall(int x, int y, bool destructible = false, int hp = 10)
+    {
+        var data = ScriptableObject.CreateInstance<StructureData>();
+        _created.Add(data);
+        data.destructible = destructible;
+        data.maxHp = hp;
+        StructureState wall = data.CreateState();
+        _match.AddStructure(wall, new Vector2Int(x, y));
+        return wall;
+    }
+
     // ─── Setup and death ─────────────────────────────────────────────────────
 
     [Test]
@@ -136,6 +148,23 @@ public class MatchTests
     {
         UnitState unit = AddUnit(PlayerID.Player1, 0, 0);
         AddUnit(PlayerID.Player2, 1, 0);
+
+        CollectionAssert.AreEquivalent(new[] { new Vector2Int(0, 1) }, _match.GetMoveTargets(unit));
+    }
+
+    [Test]
+    public void AddStructure_PlacesStructureOnBoard()
+    {
+        StructureState wall = AddWall(2, 3);
+
+        Assert.AreSame(wall, _match.Board.GetStructureAt(new Vector2Int(2, 3)));
+    }
+
+    [Test]
+    public void GetMoveTargets_ExcludesWalls()
+    {
+        UnitState unit = AddUnit(PlayerID.Player1, 0, 0);
+        AddWall(1, 0);
 
         CollectionAssert.AreEquivalent(new[] { new Vector2Int(0, 1) }, _match.GetMoveTargets(unit));
     }
@@ -286,6 +315,49 @@ public class MatchTests
         StartAndCommit();
 
         Assert.IsTrue(_match.TryUseAbility(caster, blink, new Vector2Int(1, 2)));
+    }
+
+    [Test]
+    public void TryUseAbility_DestructibleWall_LowersItsHp()
+    {
+        AbilityData strike = Strike();
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
+        AddUnit(PlayerID.Player2, 4, 4);
+        StructureState wall = AddWall(2, 3, destructible: true);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryUseAbility(caster, strike, wall.Position));
+        Assert.AreEqual(6, wall.Hp);
+        Assert.AreSame(wall, _match.Board.GetStructureAt(wall.Position));
+    }
+
+    [Test]
+    public void TryUseAbility_LethalOnWall_RemovesIt_AndCellBecomesWalkable()
+    {
+        AbilityData strike = Strike();
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
+        AddUnit(PlayerID.Player2, 4, 4);
+        StructureState wall = AddWall(2, 3, destructible: true, hp: 4);
+        StartAndCommit();
+
+        Assert.IsTrue(_match.TryUseAbility(caster, strike, wall.Position));
+        Assert.IsTrue(wall.IsDestroyed);
+        Assert.IsNull(_match.Board.GetStructureAt(new Vector2Int(2, 3)));
+        Assert.IsTrue(_match.Board.IsWalkable(new Vector2Int(2, 3)));
+    }
+
+    [Test]
+    public void TryUseAbility_IndestructibleWall_Rejected_AndTurnNotStarted()
+    {
+        AbilityData strike = Strike();
+        UnitState caster = AddUnit(PlayerID.Player1, 2, 2, strike);
+        AddUnit(PlayerID.Player2, 4, 4);
+        StructureState wall = AddWall(2, 3);
+        StartAndCommit();
+
+        Assert.IsFalse(_match.TryUseAbility(caster, strike, wall.Position));
+        Assert.IsFalse(_match.Turns.HasActiveUnitStarted);
+        Assert.AreEqual(10, wall.Hp);
     }
 
     [Test]

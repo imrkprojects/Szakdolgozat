@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>The grid as game state: its size, which unit stands where, and the movement and range rules.</summary>
+/// <summary>The grid as game state: its size, which unit and structure stands where, and the movement and range rules.</summary>
 public class Board
 {
     private static readonly Vector2Int[] Directions =
         { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
 
     private readonly Dictionary<Vector2Int, UnitState> _occupants = new Dictionary<Vector2Int, UnitState>();
+    private readonly Dictionary<Vector2Int, StructureState> _structures = new Dictionary<Vector2Int, StructureState>();
 
     public int Width { get; }
     public int Height { get; }
@@ -36,6 +37,8 @@ public class Board
         if (!InBounds(pos)) throw new ArgumentOutOfRangeException(nameof(pos), $"{pos} is outside the board.");
         UnitState occupant = GetUnitAt(pos);
         if (occupant != null && occupant != unit) throw new InvalidOperationException($"{pos} is already occupied.");
+        if (GetStructureAt(pos)?.Data.blocksMovement == true)
+            throw new InvalidOperationException($"{pos} holds a structure that blocks movement.");
 
         Remove(unit);
         _occupants[pos] = unit;
@@ -47,6 +50,35 @@ public class Board
     {
         if (GetUnitAt(unit.Position) == unit) _occupants.Remove(unit.Position);
     }
+
+    /// <summary>Returns the structure at the given cell, or null if there is none.</summary>
+    public StructureState GetStructureAt(Vector2Int pos)
+    {
+        _structures.TryGetValue(pos, out StructureState structure);
+        return structure;
+    }
+
+    /// <summary>Puts a structure on a cell without one. A movement-blocking structure can't go where a unit stands.</summary>
+    public void PlaceStructure(StructureState structure, Vector2Int pos)
+    {
+        if (!InBounds(pos)) throw new ArgumentOutOfRangeException(nameof(pos), $"{pos} is outside the board.");
+        if (GetStructureAt(pos) != null) throw new InvalidOperationException($"{pos} already holds a structure.");
+        if (structure.Data.blocksMovement && GetUnitAt(pos) != null)
+            throw new InvalidOperationException($"{pos} is occupied by a unit.");
+
+        _structures[pos] = structure;
+        structure.Position = pos;
+    }
+
+    /// <summary>Takes the structure off the board. Does nothing if it is not on it.</summary>
+    public void RemoveStructure(StructureState structure)
+    {
+        if (GetStructureAt(structure.Position) == structure) _structures.Remove(structure.Position);
+    }
+
+    /// <summary>True if a unit could step onto the cell: in bounds, no unit and no movement-blocking structure.</summary>
+    public bool IsWalkable(Vector2Int pos) =>
+        InBounds(pos) && GetUnitAt(pos) == null && GetStructureAt(pos)?.Data.blocksMovement != true;
 
     /// <summary>Returns the in-bounds orthogonal neighbours of a cell.</summary>
     public List<Vector2Int> GetAdjacent(Vector2Int pos)
@@ -111,7 +143,7 @@ public class Board
             {
                 foreach (Vector2Int pos in GetAdjacent(from))
                 {
-                    if (pos == unit.Position || cameFrom.ContainsKey(pos) || GetUnitAt(pos) != null) continue;
+                    if (pos == unit.Position || cameFrom.ContainsKey(pos) || !IsWalkable(pos)) continue;
                     cameFrom[pos] = from;
                     next.Add(pos);
                 }
