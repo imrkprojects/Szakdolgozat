@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using UnityEngine;
 
 /// <summary>
 /// Interface for interaction modes within SelectionManager.
@@ -12,6 +12,6 @@ public interface IInteractionState
     /// <summary>Called when leaving this state. Clean up highlights here.</summary>
     void Exit();
 
-    /// <summary>Handle a tile click while this state is active.</summary>
-    void HandleTileClicked(Tile clickedTile);
+    /// <summary>Handle a cell click while this state is active.</summary>
+    void HandleCellClicked(Vector2Int cell);
 }

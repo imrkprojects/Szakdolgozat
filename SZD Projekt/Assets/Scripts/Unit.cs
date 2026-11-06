@@ -21,9 +21,6 @@ public class Unit : MonoBehaviour
 
     public PlayerID OwnerID => State.Owner;
 
-    // ─── Position ────────────────────────────────────────────────────────────
-    public Tile CurrentTile => _grid.GetTile(State.Position);
-
     /// <summary>Type config this unit was created from; set by <see cref="Init"/>.</summary>
     public UnitData Data { get; private set; }
 
@@ -111,29 +108,29 @@ public class Unit : MonoBehaviour
     }
 
     // ─── Movement (System) ───────────────────────────────────────────────────
-    /// <summary>Snaps the view onto a tile after its state was placed there (spawn / teleport).</summary>
-    public void PlaceOnTile(Tile targetTile)
+    /// <summary>Snaps the view onto a cell after its state was placed there (spawn / teleport).</summary>
+    public void PlaceAt(Vector2Int cell)
     {
-        transform.position = targetTile.transform.position;
+        transform.position = _grid.CellToWorld(cell);
     }
 
     // ─── Movement (Gameplay) ─────────────────────────────────────────────────
     /// <summary>
     /// Animates the view step by step along <paramref name="path"/> after <c>Match.TryMove</c> has moved
-    /// its state to the last tile, then after a short pause invokes <paramref name="onComplete"/>.
+    /// its state to the last cell, then after a short pause invokes <paramref name="onComplete"/>.
     /// </summary>
-    public void MoveAlongPath(IReadOnlyList<Tile> path, Action onComplete = null)
+    public void MoveAlongPath(IReadOnlyList<Vector2Int> path, Action onComplete = null)
     {
         StartCoroutine(AnimateMove(path, onComplete));
     }
 
-    private IEnumerator AnimateMove(IReadOnlyList<Tile> path, Action onComplete)
+    private IEnumerator AnimateMove(IReadOnlyList<Vector2Int> path, Action onComplete)
     {
         IsMoving = true;
-        foreach (Tile tile in path)
+        foreach (Vector2Int cell in path)
         {
             Vector3 start = transform.position;
-            Vector3 target = tile.transform.position;
+            Vector3 target = _grid.CellToWorld(cell);
             for (float t = 0f; t < moveDuration; t += Time.deltaTime)
             {
                 transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t / moveDuration));

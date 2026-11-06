@@ -93,7 +93,7 @@ public class TurnOrderUI : MonoBehaviour
         CyclePhase phase = turns.Phase;
         bool offer = phase == CyclePhase.Acting && !_offerDismissed && turns.CanReorder(turns.ActivePlayer);
         // Not during Planning: a committed order must stay hidden until both players have committed
-        if (phase == CyclePhase.Acting) DrawHud(width);
+        if (phase == CyclePhase.Acting) DrawHud(width, Screen.height / scale);
 
         if (phase == CyclePhase.Planning && _planner != PlayerID.None)
         {
@@ -181,10 +181,10 @@ public class TurnOrderUI : MonoBehaviour
 
     // Both orders are public once committed; shows what is left of each cycle and the tokens,
     // with the acting player's unit highlighted
-    private void DrawHud(float width)
+    private void DrawHud(float width, float height)
     {
         PlayerID active = _match.Turns.ActivePlayer;
-        BeginPanel(new Rect(width - 260, 10, 250, 120));
+        BeginPanel(new Rect(width - 260, height - 130, 250, 120)); // bottom right
         foreach (Player player in new[] { _match.Player1, _match.Player2 })
         {
             IEnumerable<string> labels = _match.Turns.GetQueue(player.ID)

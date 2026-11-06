@@ -1,8 +1,11 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.Tilemaps;
 using System;
 using System.Collections.Generic;
 
-/// <summary>Creates and provides access to the match grid and its tiles.</summary>
+/// <summary>Draws the match grid, its highlights and hover marker, and turns mouse clicks into cell clicks.</summary>
 public class GridManager : MonoBehaviour
 {
     private const int MinimumDimension = 3;
@@ -15,11 +18,25 @@ public class GridManager : MonoBehaviour
 
     [SerializeField] private float tileSize = 1.1f; // 1.0 + slight spacing
 
-    [Header("Prefabs")] [SerializeField] private Tile tilePrefab;
+    [Header("Scene")] [SerializeField] private Grid grid;
+    [SerializeField] private Tilemap groundMap;
+    [SerializeField] private Tilemap highlightMap;
+    [SerializeField] private SpriteRenderer hoverMarker;
+    [SerializeField] private Camera cam;
 
-    private Dictionary<Vector2Int, Tile> _tiles = new Dictionary<Vector2Int, Tile>();
+    [Header("Tiles")] [SerializeField] private TileBase groundTile; // grey square
+    [SerializeField] private TileBase highlightTile; // plain white square, tinted per cell
+
+    [SerializeField] private Color reachableColor = new Color(0.2f, 0.7f, 0.2f, 0.75f);
+    [SerializeField] private Color selectedColor = new Color(0.9f, 0.85f, 0.1f, 0.75f);
+    [SerializeField] private Color abilityRangeColor = new Color(1f, 0.55f, 0.1f, 0.75f);
+    [SerializeField] private Color abilityTargetColor = new Color(0.9f, 0.1f, 0.1f, 0.75f);
+
+    private readonly Dictionary<Vector2Int, TileHighlightState> _highlights =
+        new Dictionary<Vector2Int, TileHighlightState>();
+
     private readonly Dictionary<UnitState, Unit> _unitViews = new Dictionary<UnitState, Unit>();
-    private Action<Tile> _onTileClicked;
+    private Action<Vector2Int> _onCellClicked;
 
     /// <summary>Game state of the grid; set by <see cref="BuildGrid"/>.</summary>
     public Board Board { get; private set; }
@@ -38,6 +55,7 @@ public class GridManager : MonoBehaviour
     private void Awake()
     {
         ClampDimensions();
+        hoverMarker.enabled = false;
     }
 
     private void ClampDimensions()
@@ -46,22 +64,72 @@ public class GridManager : MonoBehaviour
         height = Mathf.Max(MinimumDimension, height);
     }
 
-    /// <summary>Creates a tile for every board cell.</summary>
-    /// <param name="board">Game state the tiles represent.</param>
-    /// <param name="onTileClicked">Receives every tile click.</param>
-    public void BuildGrid(Board board, Action<Tile> onTileClicked)
+    /// <summary>Paints the ground for every board cell.</summary>
+    /// <param name="board">Game state the grid represents.</param>
+    /// <param name="onCellClicked">Receives the cell of every board click.</param>
+    public void BuildGrid(Board board, Action<Vector2Int> onCellClicked)
     {
         Board = board;
-        _onTileClicked = onTileClicked;
+        _onCellClicked = onCellClicked;
+        // Cell (x, y) is centered at (x, y) * tileSize; set here so the scene can't drift from tileSize
+        grid.cellSize = new Vector3(1f, 1f, 0f); // z 0 keeps cell centers on the z = 0 plane
+        grid.cellGap = new Vector3(tileSize - 1f, tileSize - 1f, 0f);
+        grid.transform.position = new Vector3(-0.5f, -0.5f, 0f);
         GenerateGrid();
         Debug.Log($"Grid generated with dimensions {Board.Width} x {Board.Height}.");
     }
 
-    /// <summary>Returns the tile at the given grid coordinate, or null if it is outside the grid.</summary>
-    public Tile GetTile(Vector2Int coords)
+    /// <summary>World position of the center of the given cell.</summary>
+    public Vector3 CellToWorld(Vector2Int cell) => grid.GetCellCenterWorld((Vector3Int)cell);
+
+    /// <summary>Shows the given highlight on a cell.</summary>
+    public void SetHighlight(Vector2Int cell, TileHighlightState state)
     {
-        _tiles.TryGetValue(coords, out Tile tile);
-        return tile;
+        var pos = (Vector3Int)cell;
+        if (state == TileHighlightState.None)
+        {
+            highlightMap.SetTile(pos, null);
+            _highlights.Remove(cell);
+            return;
+        }
+
+        highlightMap.SetTile(pos, highlightTile);
+        highlightMap.SetTileFlags(pos, TileFlags.None); // otherwise the tile's locked color ignores SetColor
+        highlightMap.SetColor(pos, HighlightColor(state));
+        _highlights[cell] = state;
+    }
+
+    /// <summary>The highlight currently shown on a cell.</summary>
+    public TileHighlightState GetHighlight(Vector2Int cell) =>
+        _highlights.TryGetValue(cell, out TileHighlightState state) ? state : TileHighlightState.None;
+
+    private Color HighlightColor(TileHighlightState state) => state switch
+    {
+        TileHighlightState.Reachable => reachableColor,
+        TileHighlightState.Selected => selectedColor,
+        TileHighlightState.AbilityRange => abilityRangeColor,
+        _ => abilityTargetColor
+    };
+
+    private void Update()
+    {
+        if (Board == null || Mouse.current == null) return;
+
+        Vector3 world = cam.ScreenToWorldPoint(Mouse.current.position.ReadValue());
+        var cell = (Vector2Int)grid.WorldToCell(world);
+        bool inBounds = Board.InBounds(cell);
+
+        // Hover lightens only plain, reachable and in-range cells, as the old tile colors did
+        TileHighlightState highlight = GetHighlight(cell);
+        hoverMarker.enabled = inBounds && (highlight == TileHighlightState.None
+                                           || highlight == TileHighlightState.Reachable
+                                           || highlight == TileHighlightState.AbilityRange);
+        if (hoverMarker.enabled) hoverMarker.transform.position = CellToWorld(cell);
+
+        if (!Mouse.current.leftButton.wasPressedThisFrame) return;
+        // A click on a uGUI element over the grid is not a board click
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+        if (inBounds) _onCellClicked?.Invoke(cell);
     }
 
     private void GenerateGrid()
@@ -69,14 +137,7 @@ public class GridManager : MonoBehaviour
         for (int x = 0; x < Board.Width; x++)
         {
             for (int y = 0; y < Board.Height; y++)
-            {
-                Vector3 worldPos = new Vector3(x * tileSize, y * tileSize, 0);
-                Tile spawnedTile = Instantiate(tilePrefab, worldPos, Quaternion.identity, transform);
-                spawnedTile.name = $"Tile_{x}_{y}";
-                spawnedTile.Init(x, y, this);
-
-                _tiles[new Vector2Int(x, y)] = spawnedTile;
-            }
+                groundMap.SetTile(new Vector3Int(x, y, 0), groundTile);
         }
     }
 
@@ -88,7 +149,7 @@ public class GridManager : MonoBehaviour
         return new Vector3(centerX, centerY, 0f);
     }
 
-    /// <summary>Links a unit's state to its view so tiles can report which view stands on them.</summary>
+    /// <summary>Links a unit's state to its view so a cell can report which view stands on it.</summary>
     public void RegisterUnitView(Unit unit) => _unitViews[unit.State] = unit;
 
     /// <summary>Forgets a unit's view, e.g. when it dies.</summary>
@@ -100,7 +161,4 @@ public class GridManager : MonoBehaviour
     /// <summary>Returns the view of the given unit state, or null if it has none.</summary>
     public Unit GetUnitView(UnitState state) =>
         state != null && _unitViews.TryGetValue(state, out Unit unit) ? unit : null;
-
-    /// <summary>Forwards a clicked tile to the callback given to <see cref="BuildGrid"/>.</summary>
-    public void OnTileClicked(Tile clickedTile) => _onTileClicked?.Invoke(clickedTile);
 }

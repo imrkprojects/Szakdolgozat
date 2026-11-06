@@ -14,6 +14,7 @@ public class CameraController : MonoBehaviour
     private float _targetSize;
     private Unit _followUnit;
     private SelectionManager _selection;
+    private GridManager _grid;
 
     private void Awake()
     {
@@ -25,6 +26,7 @@ public class CameraController : MonoBehaviour
     /// <summary>Snaps to the built grid and starts following the selection. Call after the grid is built.</summary>
     public void Init(GridManager grid, SelectionManager selection)
     {
+        _grid = grid;
         _selection = selection;
         _selection.OnUnitSelected += HandleUnitSelected;
         _selection.OnUnitDeselected += HandleUnitDeselected;
@@ -53,7 +55,7 @@ public class CameraController : MonoBehaviour
     /// <summary>Smoothly pans to the selected unit and zooms in.</summary>
     private void HandleUnitSelected(Unit unit)
     {
-        Vector3 unitPos = unit.CurrentTile.transform.position;
+        Vector3 unitPos = _grid.CellToWorld(unit.State.Position);
         _targetPosition = new Vector3(unitPos.x, unitPos.y, -10f);
         _targetSize = focusedSize;
     }

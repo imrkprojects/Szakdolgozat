@@ -36,6 +36,18 @@ public class GameSceneSmokeTests
         Assert.AreEqual(match.Turns.ActiveUnit, Object.FindAnyObjectByType<SelectionManager>().SelectedUnit.State,
             "SelectionManager did not select the first active unit");
 
+        // Selecting enters move mode: the overlay marks the unit's cell and every move target
+        var grid = Object.FindAnyObjectByType<GridManager>();
+        UnitState active = match.Turns.ActiveUnit;
+        Assert.AreEqual(TileHighlightState.Selected, grid.GetHighlight(active.Position), "unit cell highlight");
+        foreach (Vector2Int cell in match.GetMoveTargets(active))
+            Assert.AreEqual(TileHighlightState.Reachable, grid.GetHighlight(cell), $"move target {cell} highlight");
+
+        // Cell (x, y) stays centered at (x, y) * 1.1, so units and the camera keep their layout
+        Vector3 corner = grid.CellToWorld(new Vector2Int(grid.Width - 1, grid.Height - 1));
+        Assert.That(Vector3.Distance(new Vector3((grid.Width - 1) * 1.1f, (grid.Height - 1) * 1.1f, 0f), corner),
+            Is.LessThan(0.001f), $"cell center moved to {corner}");
+
         // The action bar shows one labelled button per ability of the selected unit and hides the rest
         IReadOnlyList<AbilityData> abilities = match.Turns.ActiveUnit.Abilities;
         for (int i = 1; i <= 4; i++)

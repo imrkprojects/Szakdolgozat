@@ -1,7 +1,7 @@
 using UnityEngine;
 using System;
 
-/// <summary>Tracks the selected unit and routes tile clicks to the active interaction state.</summary>
+/// <summary>Tracks the selected unit and routes cell clicks to the active interaction state.</summary>
 public class SelectionManager : MonoBehaviour
 {
     private Unit _selectedUnit;
@@ -41,25 +41,23 @@ public class SelectionManager : MonoBehaviour
     /// <summary>The currently selected unit, or null when nothing is selected.</summary>
     public Unit SelectedUnit => _selectedUnit;
 
-    /// <summary>Processes a tile click using the current selection and interaction state.</summary>
-    public void HandleTileClicked(Tile clickedTile)
+    /// <summary>Processes a cell click using the current selection and interaction state.</summary>
+    public void HandleCellClicked(Vector2Int cell)
     {
         if (_match.Turns.Phase != CyclePhase.Acting) return;
 
         // No unit selected — only allow clicking the active unit to select it
         if (_selectedUnit == null)
         {
-            if (clickedTile.OccupyingUnit != null
-                && clickedTile.OccupyingUnit.State == _match.Turns.ActiveUnit)
-            {
-                Select(clickedTile.OccupyingUnit);
-            }
+            Unit clicked = _grid.GetUnitView(cell);
+            if (clicked != null && clicked.State == _match.Turns.ActiveUnit)
+                Select(clicked);
 
             return;
         }
 
         // A unit is selected — delegate the click to the current interaction state
-        _currentState?.HandleTileClicked(clickedTile);
+        _currentState?.HandleCellClicked(cell);
     }
 
     /// <summary>Switches the selected unit to its default movement mode.</summary>
@@ -89,7 +87,7 @@ public class SelectionManager : MonoBehaviour
         _currentState = null;
         _selectedUnit = null;
         OnUnitDeselected?.Invoke();
-        Debug.Log($"Deselected {unit.name} at {unit.CurrentTile.Coords}");
+        Debug.Log($"Deselected {unit.name} at {unit.State.Position}");
     }
 
     /// <summary>
@@ -107,7 +105,7 @@ public class SelectionManager : MonoBehaviour
         if (_selectedUnit != null) Deselect();
         _selectedUnit = unit;
         OnUnitSelected?.Invoke(unit);
-        Debug.Log($"Selected {unit.name} at {unit.CurrentTile.Coords}");
+        Debug.Log($"Selected {unit.name} at {unit.State.Position}");
 
         // Default to move mode on selection
         SetState(new MoveState(this, _match, _grid));

@@ -42,10 +42,10 @@ public class GameBootstrap : MonoBehaviour
 
         Match = new Match(grid.Width, grid.Height);
         Debug.Log($"Players initialized: {Match.Player1.Name} vs {Match.Player2.Name}");
-        // The turn order panel is IMGUI, which tile clicks don't see, so clicks on it are dropped here
-        grid.BuildGrid(Match.Board, tile =>
+        // The turn order panel is IMGUI, which board clicks don't see, so clicks on it are dropped here
+        grid.BuildGrid(Match.Board, cell =>
         {
-            if (!turnOrderUI.IsPointerOverPanel) selectionManager.HandleTileClicked(tile);
+            if (!turnOrderUI.IsPointerOverPanel) selectionManager.HandleCellClicked(cell);
         });
 
         // Everything that reacts to selection or turns subscribes before the match starts and fires the first turn
@@ -87,7 +87,7 @@ public class GameBootstrap : MonoBehaviour
         unit.Init(data, owner, Match.GetPlayer(owner).Color, grid);
         unit.SetNumber(number);
         Match.AddUnit(unit.State, pos);
-        unit.PlaceOnTile(grid.GetTile(pos));
+        unit.PlaceAt(pos);
         playerStatusUI.AddUnit(unit);
     }
 }
