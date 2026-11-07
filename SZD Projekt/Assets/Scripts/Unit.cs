@@ -15,6 +15,7 @@ public class Unit : MonoBehaviour
 
     // ─── State ───────────────────────────────────────────────────────────────
     private GridManager _grid;
+    private int _lastHp; // HP at the last change, to work out the amount for the floating number
 
     /// <summary>Game state of this unit; created by <see cref="Init"/>.</summary>
     public UnitState State { get; private set; }
@@ -65,6 +66,7 @@ public class Unit : MonoBehaviour
         _grid = grid;
         Data = data;
         State = data.CreateState(ownerID);
+        _lastHp = State.Hp;
         if (data.sprite != null)
         {
             if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
@@ -158,7 +160,23 @@ public class Unit : MonoBehaviour
     }
 
     // ─── Health ──────────────────────────────────────────────────────────────
-    private void HandleHealthChanged(UnitState state) => Debug.Log($"{name} HP: {CurrentHp}/{MaxHp}");
+    private void HandleHealthChanged(UnitState state)
+    {
+        Debug.Log($"{name} HP: {CurrentHp}/{MaxHp}");
+        int delta = state.Hp - _lastHp;
+        _lastHp = state.Hp;
+        // Not parented to the unit, so the number outlives a unit destroyed by this hit
+        _grid.ShowHpChange(transform.position, delta);
+        if (delta < 0 && state.IsAlive) StartCoroutine(Flash());
+    }
+
+    private IEnumerator Flash()
+    {
+        (float alpha, float duration) = _grid.Flash;
+        _spriteRenderer.color = new Color(unitColor.r, unitColor.g, unitColor.b, alpha);
+        yield return new WaitForSeconds(duration);
+        _spriteRenderer.color = unitColor;
+    }
 
     private void HandleDied(UnitState state)
     {

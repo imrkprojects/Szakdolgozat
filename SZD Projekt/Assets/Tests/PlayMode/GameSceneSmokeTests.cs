@@ -68,6 +68,13 @@ public class GameSceneSmokeTests
                 Assert.AreEqual(abilities[i - 1].abilityName,
                     button.GetComponentInChildren<TMPro.TMP_Text>().text, $"AbilityButton{i} label");
         }
+
+        // Hit feedback is wired for both units and structures: each HP change spawns one floating number
+        active.TakeDamage(1);
+        Assert.AreEqual(1, Object.FindObjectsByType<FloatingText>().Length, "unit hit");
+        (Vector2Int wallCell, _) = painted.First(p => p.data.destructible);
+        match.Board.GetStructureAt(wallCell).TakeDamage(1);
+        Assert.AreEqual(2, Object.FindObjectsByType<FloatingText>().Length, "wall hit");
     }
 
     private static void AssertSpawnedLineup(Match match, PlayerID owner, IReadOnlyList<UnitData> lineup)
